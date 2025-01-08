@@ -149,7 +149,7 @@
           // Validate username
           if (username.length < 3) {
             document.getElementById("username-error").textContent =
-              "Username must be at least 3 characters long";
+              "用户名至少需要3个字符";
             document.getElementById("username-error").style.display = "block";
             return;
           }
@@ -157,7 +157,7 @@
           // Validate password
           if (password.length < 6) {
             document.getElementById("password-error").textContent =
-              "Password must be at least 6 characters long";
+              "密码至少需要6个字符";
             document.getElementById("password-error").style.display = "block";
             return;
           }
@@ -169,22 +169,34 @@
           loginButton.textContent = "";
 
           try {
-            // Simulate API call (replace this with your actual login API call)
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const response = await fetch("/api/login", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ username, password }),
+            });
 
-            // For demonstration, we'll just log the values
-            console.log("Login attempt with:", { username, password });
+            const data = await response.json();
 
-            // Redirect to dashboard (replace with your actual dashboard URL)
-            // window.location.href = 'dashboard.html';
+            if (!response.ok) {
+              throw new Error(data.error || "登录失败");
+            }
+
+            // Store token and user info in localStorage
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data.user));
+
+            // Redirect to dashboard
+            window.location.href = "/dashboard.html";
           } catch (error) {
             console.error("Login failed:", error);
-            alert("Login failed. Please try again.");
+            alert(error.message || "登录失败，请重试");
           } finally {
             // Reset button state
             loginButton.classList.remove("loading");
             loginButton.disabled = false;
-            loginButton.textContent = "Login";
+            loginButton.textContent = "登录";
           }
         });
     </script>

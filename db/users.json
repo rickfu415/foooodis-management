@@ -1,0 +1,32 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "username": "admin",
+      "password": "hashed_password_here",
+      "role": "admin",
+      "name": "管理员",
+      "created_at": "2024-03-20T00:00:00Z",
+      "last_login": null,
+      "status": "active"
+    },
+    {
+      "id": "2",
+      "username": "staff1",
+      "password": "hashed_password_here",
+      "role": "staff",
+      "name": "张三",
+      "created_at": "2024-03-20T00:00:00Z",
+      "last_login": null,
+      "status": "active"
+    }
+  ],
+  "roles": {
+    "admin": {
+      "permissions": ["all"]
+    },
+    "staff": {
+      "permissions": ["view_inventory", "update_inventory"]
+    }
+  }
+}
