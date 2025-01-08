@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -132,6 +132,48 @@
     </div>
 
     <script>
+      // User data directly in the file
+      const USERS_DATA = {
+        users: [
+          {
+            id: "1",
+            username: "admin",
+            password: "zxc,./123",
+            role: "admin",
+            name: "管理员",
+            status: "active",
+          },
+          {
+            id: "2",
+            username: "staff1",
+            password: "zxc,./123",
+            role: "staff",
+            name: "张三",
+            status: "active",
+          },
+        ],
+      };
+
+      // Function to check login credentials
+      function checkLogin(username, password) {
+        const user = USERS_DATA.users.find(
+          (u) =>
+            u.username === username &&
+            u.password === password &&
+            u.status === "active"
+        );
+
+        if (user) {
+          return {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            role: user.role,
+          };
+        }
+        return null;
+      }
+
       document
         .getElementById("loginForm")
         .addEventListener("submit", async function (e) {
@@ -169,26 +211,18 @@
           loginButton.textContent = "";
 
           try {
-            const response = await fetch("/api/login", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ username, password }),
-            });
+            // Check login credentials
+            const userData = checkLogin(username, password);
 
-            const data = await response.json();
-
-            if (!response.ok) {
-              throw new Error(data.error || "登录失败");
+            if (!userData) {
+              throw new Error("用户名或密码错误");
             }
 
-            // Store token and user info in localStorage
-            localStorage.setItem("token", data.token);
-            localStorage.setItem("user", JSON.stringify(data.user));
+            // Store user info in localStorage
+            localStorage.setItem("user", JSON.stringify(userData));
 
-            // Redirect to success page instead of dashboard
-            window.location.href = "/login-success.html";
+            // Redirect to success page
+            window.location.href = "login-success.html";
           } catch (error) {
             console.error("Login failed:", error);
             alert(error.message || "登录失败，请重试");
