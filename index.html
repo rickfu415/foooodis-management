@@ -187,8 +187,8 @@
             localStorage.setItem("token", data.token);
             localStorage.setItem("user", JSON.stringify(data.user));
 
-            // Redirect to dashboard
-            window.location.href = "/dashboard.html";
+            // Redirect to success page instead of dashboard
+            window.location.href = "/login-success.html";
           } catch (error) {
             console.error("Login failed:", error);
             alert(error.message || "登录失败，请重试");
