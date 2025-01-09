@@ -51,23 +51,25 @@
         display: block;
         margin-bottom: 5px;
         color: #333;
+        font-weight: bold;
       }
 
       input,
       select {
         width: 100%;
-        padding: 8px;
+        padding: 12px;
         border: 1px solid #ddd;
         border-radius: 4px;
-        font-size: 14px;
+        font-size: 16px;
       }
 
       .btn {
-        padding: 8px 16px;
+        padding: 12px 20px;
         border: none;
         border-radius: 4px;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 16px;
+        margin-right: 10px;
       }
 
       .btn-primary {
@@ -79,7 +81,6 @@
         background-color: #6c757d;
         color: white;
         text-decoration: none;
-        margin-right: 10px;
       }
 
       .product-list {
@@ -87,155 +88,87 @@
       }
 
       .product-item {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px;
-        border-bottom: 1px solid #eee;
       }
 
       .product-info {
         flex-grow: 1;
       }
 
-      .product-actions {
-        display: flex;
-        gap: 10px;
+      .product-name {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 5px;
+      }
+
+      .product-details {
+        color: #666;
+        font-size: 14px;
       }
 
       .btn-delete {
         background-color: #dc3545;
         color: white;
+        padding: 8px 16px;
       }
 
-      .category-section {
-        margin-bottom: 30px;
-      }
-
-      .category-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+      .section-title {
+        font-size: 18px;
+        color: #333;
         margin-bottom: 15px;
         padding-bottom: 10px;
-        border-bottom: 2px solid #f0f0f0;
-      }
-
-      .product-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 15px;
-      }
-
-      .product-card {
-        background-color: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        padding: 15px;
-        position: relative;
-      }
-
-      .product-specs {
-        margin-top: 10px;
-        padding-top: 10px;
-        border-top: 1px solid #eee;
-      }
-
-      .spec-item {
-        display: flex;
-        justify-content: space-between;
-        margin: 5px 0;
-        color: #666;
-      }
-
-      .search-bar {
-        margin-bottom: 20px;
-        display: flex;
-        gap: 10px;
-      }
-
-      .search-input {
-        flex: 1;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-      }
-
-      .filter-select {
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        min-width: 120px;
+        border-bottom: 2px solid #eee;
       }
     </style>
   </head>
   <body>
     <header class="header">
-      <div>
-        <a href="select-store.html" class="btn btn-back">返回</a>
-        <span>商品管理</span>
-      </div>
-      <button class="btn btn-primary" onclick="showAddProductModal()">
-        添加商品
-      </button>
+      <a href="select-store.html" class="btn btn-back">返回</a>
+      <span>商品管理</span>
     </header>
 
     <div class="product-container">
-      <div class="search-bar">
-        <input
-          type="text"
-          class="search-input"
-          placeholder="搜索商品..."
-          onkeyup="filterProducts()"
-        />
-        <select class="filter-select" onchange="filterProducts()">
-          <option value="all">全部分类</option>
-          <option value="drinks">饮品</option>
-          <option value="bakery">烘焙</option>
-        </select>
+      <!-- 添加商品表单 -->
+      <div class="add-product">
+        <h3 class="section-title">添加新商品</h3>
+        <form onsubmit="addProduct(event)">
+          <div class="form-group">
+            <label>品类</label>
+            <select name="category" required>
+              <option value="drinks">饮品</option>
+              <option value="bakery">烘焙</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>商品名称</label>
+            <input type="text" name="name" required />
+          </div>
+          <div class="form-group">
+            <label>价格</label>
+            <select name="price" required>
+              <option value="6">6元</option>
+              <option value="8">8元</option>
+              <option value="10">10元</option>
+              <option value="12">12元</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">添加商品</button>
+        </form>
       </div>
 
-      <div id="drinksSection" class="category-section">
-        <div class="category-header">
-          <h2>饮品</h2>
+      <!-- 商品列表 -->
+      <div class="product-list">
+        <h3 class="section-title">商品列表</h3>
+        <div id="productList">
+          <!-- 商品列表将通过 JavaScript 动态生成 -->
         </div>
-        <div class="product-grid" id="drinksList"></div>
       </div>
-
-      <div id="bakerySection" class="category-section">
-        <div class="category-header">
-          <h2>烘焙</h2>
-        </div>
-        <div class="product-grid" id="bakeryList"></div>
-      </div>
-    </div>
-
-    <div class="add-product" id="addForm" style="display: none">
-      <h3>添加新商品</h3>
-      <form onsubmit="addProduct(event)">
-        <div class="form-group">
-          <label>品类</label>
-          <select name="category" required>
-            <option value="drinks">饮品</option>
-            <option value="bakery">烘焙</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>商品名称</label>
-          <input type="text" name="name" required />
-        </div>
-        <div class="form-group">
-          <label>价格</label>
-          <select name="price" required>
-            <option value="6">6元</option>
-            <option value="8">8元</option>
-            <option value="10">10元</option>
-            <option value="12">12元</option>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary">保存</button>
-        <button type="button" class="btn" onclick="hideAddForm()">取消</button>
-      </form>
     </div>
 
     <script>
@@ -243,17 +176,8 @@
       function checkAdmin() {
         const user = JSON.parse(localStorage.getItem("user"));
         if (!user || user.role !== "admin") {
-          window.location.href = "dashboard.html";
+          window.location.href = "select-store.html";
         }
-      }
-
-      // 显示/隐藏添加表单
-      function showAddForm() {
-        document.getElementById("addForm").style.display = "block";
-      }
-
-      function hideAddForm() {
-        document.getElementById("addForm").style.display = "none";
       }
 
       // 添加商品
@@ -283,7 +207,6 @@
 
         // 刷新显示
         renderProducts();
-        hideAddForm();
         form.reset();
       }
 
@@ -300,85 +223,32 @@
       // 渲染商品列表
       function renderProducts() {
         const products = JSON.parse(localStorage.getItem("products") || "[]");
-        const drinksList = document.getElementById("drinksList");
-        const bakeryList = document.getElementById("bakeryList");
+        const listElement = document.getElementById("productList");
 
-        // 分类商品
-        const drinks = products.filter((p) => p.category === "drinks");
-        const bakery = products.filter((p) => p.category === "bakery");
+        if (products.length === 0) {
+          listElement.innerHTML =
+            '<p style="color: #666; text-align: center;">暂无商品</p>';
+          return;
+        }
 
-        // 渲染饮品
-        drinksList.innerHTML = drinks
-          .map((product) => createProductCard(product))
-          .join("");
-
-        // 渲染烘焙
-        bakeryList.innerHTML = bakery
-          .map((product) => createProductCard(product))
-          .join("");
-      }
-
-      // 创建商品卡片
-      function createProductCard(product) {
-        return `
-          <div class="product-card">
-            <h3>${product.name}</h3>
-            <div class="product-specs">
-              <div class="spec-item">
-                <span>${product.price}元</span>
-                <button class="btn btn-delete" onclick="deleteProduct('${product.id}')">删除</button>
+        listElement.innerHTML = products
+          .map(
+            (product) => `
+          <div class="product-item">
+            <div class="product-info">
+              <div class="product-name">${product.name}</div>
+              <div class="product-details">
+                ${product.category === "drinks" ? "饮品" : "烘焙"} · ${
+              product.price
+            }元
               </div>
             </div>
+            <button class="btn btn-delete" onclick="deleteProduct('${
+              product.id
+            }')">删除</button>
           </div>
-        `;
-      }
-
-      // 搜索和筛选商品
-      function filterProducts() {
-        const searchText = document
-          .querySelector(".search-input")
-          .value.toLowerCase();
-        const category = document.querySelector(".filter-select").value;
-
-        const drinksSection = document.getElementById("drinksSection");
-        const bakerySection = document.getElementById("bakerySection");
-
-        // 根据分类显示/隐藏区块
-        if (category === "all" || category === "drinks") {
-          drinksSection.style.display = "block";
-        } else {
-          drinksSection.style.display = "none";
-        }
-
-        if (category === "all" || category === "bakery") {
-          bakerySection.style.display = "block";
-        } else {
-          bakerySection.style.display = "none";
-        }
-
-        // 过滤商品
-        const products = JSON.parse(localStorage.getItem("products") || "[]");
-        const filteredProducts = products.filter((product) => {
-          const matchesSearch = product.name.toLowerCase().includes(searchText);
-          const matchesCategory =
-            category === "all" || product.category === category;
-          return matchesSearch && matchesCategory;
-        });
-
-        // 重新渲染过滤后的商品
-        renderFilteredProducts(filteredProducts);
-      }
-
-      // 渲染过滤后的商品
-      function renderFilteredProducts(products) {
-        const drinks = products.filter((p) => p.category === "drinks");
-        const bakery = products.filter((p) => p.category === "bakery");
-
-        document.getElementById("drinksList").innerHTML = drinks
-          .map((product) => createProductCard(product))
-          .join("");
-        document.getElementById("bakeryList").innerHTML = bakery
-          .map((product) => createProductCard(product))
+        `
+          )
           .join("");
       }
 
