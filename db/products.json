@@ -1,0 +1,14 @@
+{
+  "categories": [
+    {
+      "id": "drinks",
+      "name": "饮品",
+      "products": []
+    },
+    {
+      "id": "bakery",
+      "name": "烘焙",
+      "products": []
+    }
+  ]
+}
