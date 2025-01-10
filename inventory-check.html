@@ -296,6 +296,12 @@
         serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
       });
 
+      // 从 URL 获取盘点类型
+      function getInventoryTypeFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get("type") || "opening";
+      }
+
       // 设置默认日期为今天
       function setDefaultDates() {
         const today = new Date().toISOString().split("T")[0];
@@ -385,6 +391,7 @@
 
           const date = document.getElementById(`${type}Date`).value;
           const items = [];
+          let hasItems = false;
 
           // 获取店铺信息
           const storeData = JSON.parse(
@@ -407,16 +414,24 @@
                 ) || 0;
               const note = row.querySelector(".note-field").value;
 
-              items.push({
-                product: {
-                  __type: "Pointer",
-                  className: "Product",
-                  objectId: productId,
-                },
-                quantity: quantity,
-                note: note,
-              });
+              if (quantity > 0) {
+                hasItems = true;
+                items.push({
+                  product: {
+                    __type: "Pointer",
+                    className: "Product",
+                    objectId: productId,
+                  },
+                  quantity: quantity,
+                  note: note,
+                });
+              }
             });
+
+          if (!hasItems) {
+            alert("请至少输入一件商品的数量");
+            return;
+          }
 
           // 创建盘点记录
           const InventoryCheck = AV.Object.extend("InventoryCheck");
@@ -431,15 +446,11 @@
           check.set("storeName", storeData.name);
 
           await check.save();
-
           alert("盘点记录提交成功！");
-          // 重置表单
-          loadInventoryList(type);
 
-          // 延迟一秒后返回 Dashboard
-          setTimeout(() => {
-            window.location.href = "dashboard.html";
-          }, 1000);
+          // 返回 Dashboard 并强制刷新
+          window.location.href =
+            "dashboard.html?refresh=" + new Date().getTime();
         } catch (error) {
           console.error("提交盘点记录失败:", error);
           alert(error.message || "提交失败，请重试");
@@ -461,7 +472,9 @@
       // 页面加载时执行
       window.onload = function () {
         setDefaultDates();
-        selectInventoryType("opening"); // 默认显示开店盘点
+        // 从 URL 获取盘点类型并选择
+        const type = getInventoryTypeFromUrl();
+        selectInventoryType(type);
       };
     </script>
   </body>

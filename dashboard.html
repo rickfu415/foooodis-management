@@ -430,9 +430,15 @@
           : "工作台";
 
         // 加载各项数据
-        getTodayInventoryStatus();
-        getInventoryAlerts();
-        getProductStats();
+        await getTodayInventoryStatus();
+        await getInventoryAlerts();
+        await getProductStats();
+
+        // 每分钟刷新一次状态
+        setInterval(async () => {
+          await getTodayInventoryStatus();
+          await getInventoryAlerts();
+        }, 60000);
       };
     </script>
   </body>
