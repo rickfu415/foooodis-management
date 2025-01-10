@@ -126,11 +126,52 @@
         border-bottom: 2px solid #eee;
       }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 检查用户是否已登录
+      async function checkAdmin() {
+        const currentUser = AV.User.current();
+        if (!currentUser) {
+          // 尝试从 localStorage 恢复用户会话
+          const userData = JSON.parse(localStorage.getItem("user") || "{}");
+          if (userData.id) {
+            try {
+              await AV.User.become(userData.sessionToken);
+            } catch (error) {
+              console.error("Session recovery failed:", error);
+              alert("登录已过期，请重新登录");
+              window.location.href = "index.html";
+              return;
+            }
+          } else {
+            alert("请先登录");
+            window.location.href = "index.html";
+            return;
+          }
+        }
+
+        // 检查是否是管理员
+        const role = currentUser.get("role");
+        if (role !== "admin") {
+          alert("您没有访问权限");
+          window.location.href = "index.html";
+          return;
+        }
+      }
+    </script>
   </head>
   <body>
     <header class="header">
-      <a href="select-store.html" class="btn btn-back">返回</a>
+      <a href="select-store.html" class="btn btn-back">返回店铺选择</a>
       <span>商品管理</span>
+      <button onclick="logout()" class="btn btn-back">退出登录</button>
     </header>
 
     <div class="product-container">
@@ -172,57 +213,112 @@
     </div>
 
     <script>
-      // 检查管理员权限
-      function checkAdmin() {
-        const user = JSON.parse(localStorage.getItem("user"));
-        if (!user || user.role !== "admin") {
-          window.location.href = "select-store.html";
+      // 登出功能
+      async function logout() {
+        try {
+          await AV.User.logOut();
+          localStorage.removeItem("user");
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("登出失败:", error);
+          alert("登出失败，请重试");
+        }
+      }
+
+      // 获取商品列表
+      async function fetchProducts() {
+        try {
+          const query = new AV.Query("Product");
+          const results = await query.find();
+          return results.map((product) => ({
+            id: product.id,
+            name: product.get("name"),
+            category: product.get("category"),
+            price: product.get("price"),
+          }));
+        } catch (error) {
+          console.error("获取商品列表失败:", error);
+          return [];
         }
       }
 
       // 添加商品
-      function addProduct(event) {
+      async function addProduct(event) {
         event.preventDefault();
         const form = event.target;
         const category = form.category.value;
         const name = form.name.value;
         const price = form.price.value;
 
-        // 生成商品ID
-        const productId = `${category === "drinks" ? "d" : "b"}${Date.now()}`;
+        try {
+          // 检查用户是否已登录
+          let currentUser = AV.User.current();
+          if (!currentUser) {
+            // 尝试从 localStorage 恢复用户会话
+            const userData = JSON.parse(localStorage.getItem("user") || "{}");
+            if (userData.sessionToken) {
+              try {
+                currentUser = await AV.User.become(userData.sessionToken);
+              } catch (error) {
+                console.error("Session recovery failed:", error);
+                alert("登录已过期，请重新登录");
+                window.location.href = "index.html";
+                return;
+              }
+            } else {
+              alert("请先登录");
+              window.location.href = "index.html";
+              return;
+            }
+          }
 
-        // 获取现有商品数据
-        let products = JSON.parse(localStorage.getItem("products") || "[]");
+          const Product = AV.Object.extend("Product");
+          const product = new Product();
 
-        // 添加新商品
-        products.push({
-          id: productId,
-          category,
-          name,
-          price: parseInt(price),
-        });
+          // 设置产品数据
+          product.set("name", name);
+          product.set("category", category);
+          product.set("price", parseInt(price));
 
-        // 保存更新后的商品数据
-        localStorage.setItem("products", JSON.stringify(products));
+          // 设置 ACL
+          const acl = new AV.ACL();
+          acl.setPublicReadAccess(true); // 所有人可读
+          acl.setWriteAccess(currentUser, true); // 创建者可写
+          product.setACL(acl);
 
-        // 刷新显示
-        renderProducts();
-        form.reset();
+          await product.save();
+          renderProducts();
+          form.reset();
+        } catch (error) {
+          console.error("添加商品失败:", error);
+          alert(error.message || "添加商品失败，请重试");
+        }
       }
 
       // 删除商品
-      function deleteProduct(productId) {
+      async function deleteProduct(productId) {
         if (confirm("确定要删除这个商品吗？")) {
-          let products = JSON.parse(localStorage.getItem("products") || "[]");
-          products = products.filter((p) => p.id !== productId);
-          localStorage.setItem("products", JSON.stringify(products));
-          renderProducts();
+          try {
+            const currentUser = AV.User.current();
+            if (!currentUser) {
+              alert("请先登录");
+              window.location.href = "index.html";
+              return;
+            }
+
+            const product = AV.Object.createWithoutData("Product", productId);
+            await product.destroy();
+            renderProducts();
+          } catch (error) {
+            console.error("删除商品失败:", error);
+            alert(error.message || "删除商品失败，请重试");
+          }
         }
       }
 
       // 渲染商品列表
-      function renderProducts() {
-        const products = JSON.parse(localStorage.getItem("products") || "[]");
+      async function renderProducts() {
+        const products = await fetchProducts();
         const listElement = document.getElementById("productList");
 
         if (products.length === 0) {
@@ -234,20 +330,20 @@
         listElement.innerHTML = products
           .map(
             (product) => `
-          <div class="product-item">
-            <div class="product-info">
-              <div class="product-name">${product.name}</div>
-              <div class="product-details">
-                ${product.category === "drinks" ? "饮品" : "烘焙"} · ${
+            <div class="product-item">
+              <div class="product-info">
+                <div class="product-name">${product.name}</div>
+                <div class="product-details">
+                  ${product.category === "drinks" ? "饮品" : "烘焙"} · ${
               product.price
             }元
+                </div>
               </div>
+              <button class="btn btn-delete" onclick="deleteProduct('${
+                product.id
+              }')">删除</button>
             </div>
-            <button class="btn btn-delete" onclick="deleteProduct('${
-              product.id
-            }')">删除</button>
-          </div>
-        `
+          `
           )
           .join("");
       }

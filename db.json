@@ -1,0 +1,10 @@
+{
+  "products": [],
+  "inventory": {
+    "stores": {
+      "d1": {
+        "records": []
+      }
+    }
+  }
+}
