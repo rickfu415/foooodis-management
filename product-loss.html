@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>商品报损 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .container {
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .section-title {
+        font-size: 18px;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+      }
+
+      .loss-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      .loss-table th,
+      .loss-table td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        text-align: left;
+      }
+
+      .loss-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+      }
+
+      .loss-table input {
+        width: 80px;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .loss-reason {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .loss-history {
+        margin-top: 30px;
+      }
+
+      .history-item {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        color: #666;
+        font-size: 14px;
+      }
+
+      .history-content {
+        margin-top: 10px;
+      }
+
+      .history-product {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <a href="dashboard.html" class="btn btn-back">返回工作台</a>
+      <span>商品报损</span>
+      <button onclick="logout()" class="btn btn-back">退出登录</button>
+    </header>
+
+    <div class="container">
+      <!-- 报损记录表单 -->
+      <div class="loss-form">
+        <h3 class="section-title">记录报损</h3>
+        <div class="form-group">
+          <label>报损日期</label>
+          <input type="date" id="lossDate" required />
+        </div>
+        <table class="loss-table">
+          <thead>
+            <tr>
+              <th>商品名称</th>
+              <th>类别</th>
+              <th>报损数量</th>
+              <th>报损原因</th>
+            </tr>
+          </thead>
+          <tbody id="lossProductList">
+            <!-- 将通过 JavaScript 动态填充 -->
+          </tbody>
+        </table>
+        <button
+          class="btn btn-primary"
+          onclick="submitLossRecord()"
+          style="margin-top: 20px"
+        >
+          提交报损记录
+        </button>
+      </div>
+
+      <!-- 报损历史记录 -->
+      <div class="loss-history">
+        <h3 class="section-title">报损历史</h3>
+        <div id="lossHistoryList">
+          <!-- 将通过 JavaScript 动态填充 -->
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 设置默认日期为今天
+      function setDefaultDate() {
+        const today = new Date().toISOString().split("T")[0];
+        document.getElementById("lossDate").value = today;
+      }
+
+      // 加载商品列表
+      async function loadProductList() {
+        try {
+          const query = new AV.Query("Product");
+          const products = await query.find();
+
+          const listElement = document.getElementById("lossProductList");
+          listElement.innerHTML = products
+            .map((product) => {
+              const name = product.get("name");
+              const category =
+                product.get("category") === "drinks" ? "饮品" : "烘焙";
+
+              return `
+              <tr data-id="${product.id}">
+                <td>${name}</td>
+                <td>${category}</td>
+                <td><input type="number" min="0" class="loss-count" /></td>
+                <td>
+                  <select class="loss-reason">
+                    <option value="">选择原因...</option>
+                    <option value="过期">过期</option>
+                    <option value="破损">破损</option>
+                    <option value="质量问题">质量问题</option>
+                    <option value="其他">其他</option>
+                  </select>
+                </td>
+              </tr>
+            `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载商品列表失败:", error);
+          alert("加载商品列表失败，请重试");
+        }
+      }
+
+      // 加载报损历史
+      async function loadLossHistory() {
+        try {
+          const query = new AV.Query("ProductLoss");
+          query.descending("date");
+          query.limit(10); // 最近10条记录
+          const losses = await query.find();
+
+          const historyElement = document.getElementById("lossHistoryList");
+          if (losses.length === 0) {
+            historyElement.innerHTML =
+              '<div class="history-item">暂无报损记录</div>';
+            return;
+          }
+
+          historyElement.innerHTML = losses
+            .map((loss) => {
+              const date = loss.get("date").toLocaleDateString();
+              const operator = loss.get("operator").get("name");
+              const items = loss.get("items");
+
+              return `
+              <div class="history-item">
+                <div class="history-header">
+                  <span>报损日期：${date}</span>
+                  <span>操作人：${operator}</span>
+                </div>
+                <div class="history-content">
+                  ${items
+                    .map(
+                      (item) => `
+                    <div class="history-product">
+                      <span>${item.productName}</span>
+                      <span>${item.quantity}个 - ${item.reason}</span>
+                    </div>
+                  `
+                    )
+                    .join("")}
+                </div>
+              </div>
+            `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载报损历史失败:", error);
+          alert("加载报损历史失败，请重试");
+        }
+      }
+
+      // 提交报损记录
+      async function submitLossRecord() {
+        try {
+          const currentUser = AV.User.current();
+          if (!currentUser) {
+            alert("请先登录");
+            window.location.href = "index.html";
+            return;
+          }
+
+          const date = document.getElementById("lossDate").value;
+          const items = [];
+          let hasLoss = false;
+
+          // 收集表单数据
+          document.querySelectorAll("#lossProductList tr").forEach((row) => {
+            const productId = row.dataset.id;
+            const quantity =
+              parseInt(row.querySelector(".loss-count").value) || 0;
+            const reason = row.querySelector(".loss-reason").value;
+
+            if (quantity > 0) {
+              if (!reason) {
+                throw new Error("请为所有报损商品选择报损原因");
+              }
+              hasLoss = true;
+              items.push({
+                product: productId,
+                quantity: quantity,
+                reason: reason,
+                productName: row.querySelector("td").textContent,
+              });
+            }
+          });
+
+          if (!hasLoss) {
+            alert("请至少输入一件报损商品");
+            return;
+          }
+
+          // 创建报损记录
+          const ProductLoss = AV.Object.extend("ProductLoss");
+          const loss = new ProductLoss();
+
+          loss.set("date", new Date(date));
+          loss.set("items", items);
+          loss.set("operator", currentUser);
+
+          await loss.save();
+
+          alert("报损记录提交成功！");
+          // 重新加载数据
+          loadProductList();
+          loadLossHistory();
+        } catch (error) {
+          console.error("提交报损记录失败:", error);
+          alert(error.message || "提交失败，请重试");
+        }
+      }
+
+      // 登出功能
+      async function logout() {
+        try {
+          await AV.User.logOut();
+          localStorage.removeItem("user");
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("登出失败:", error);
+          alert("登出失败，请重试");
+        }
+      }
+
+      // 页面加载时执行
+      window.onload = function () {
+        setDefaultDate();
+        loadProductList();
+        loadLossHistory();
+      };
+    </script>
+  </body>
+</html>

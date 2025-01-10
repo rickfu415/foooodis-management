@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>食圈儿 - 库存管理系统</title>
+    <title>食圈儿后台管理系统</title>
     <style>
       * {
         margin: 0;
@@ -29,314 +29,387 @@
         align-items: center;
       }
 
-      .user-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .user-name {
-        color: #333;
+      .store-info {
+        font-size: 18px;
         font-weight: bold;
+        color: #333;
       }
 
-      .user-role {
-        color: #666;
-        font-size: 14px;
-      }
-
-      .logout-btn {
-        padding: 8px 16px;
-        background-color: #dc3545;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-
-      .logout-btn:hover {
-        background-color: #c82333;
-      }
-
-      .dashboard-grid {
+      .container {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 20px;
-        margin-top: 20px;
+        margin-bottom: 20px;
       }
 
-      .dashboard-card {
+      .card {
         background-color: white;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         padding: 20px;
-        text-align: center;
-        cursor: pointer;
-        transition: transform 0.2s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
 
-      .dashboard-card:hover {
-        transform: translateY(-5px);
-      }
-
-      .card-icon {
-        width: 60px;
-        height: 60px;
-        margin: 0 auto 15px;
-        background-color: #f8f9fa;
-        border-radius: 50%;
+      .card-header {
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        justify-content: center;
-        font-size: 24px;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
       }
 
       .card-title {
         font-size: 18px;
         color: #333;
-        margin-bottom: 10px;
+        font-weight: bold;
       }
 
-      .card-description {
-        font-size: 14px;
-        color: #666;
-        line-height: 1.4;
+      .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
       }
 
-      .morning {
-        background-color: #fff3cd;
-      }
-      .afternoon {
-        background-color: #cfe2ff;
-      }
-      .evening {
-        background-color: #d1e7dd;
+      .status-done {
+        background-color: #28a745;
       }
 
-      .store-info {
-        background-color: white;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
+      .status-pending {
+        background-color: #dc3545;
+      }
+
+      .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-success {
+        background-color: #28a745;
+        color: white;
+      }
+
+      .btn-danger {
+        background-color: #dc3545;
+        color: white;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+      }
+
+      .inventory-status {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .status-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
       }
 
-      .store-details {
+      .status-text {
         display: flex;
         align-items: center;
-        gap: 20px;
       }
 
-      .store-name {
-        font-size: 20px;
-        font-weight: bold;
-        color: #333;
-      }
-
-      .store-type-badge {
-        padding: 4px 8px;
-        border-radius: 4px;
+      .status-time {
+        color: #666;
         font-size: 14px;
       }
 
-      .type-direct {
-        background-color: #cce5ff;
-        color: #004085;
-      }
-
-      .type-franchise {
+      .alert-card {
         background-color: #fff3cd;
+        border: 1px solid #ffeeba;
         color: #856404;
+        padding: 15px;
+        border-radius: 4px;
+        margin-top: 10px;
       }
 
-      .date-info {
-        text-align: right;
-        color: #666;
+      .statistics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 15px;
       }
 
-      .current-date {
+      .stat-item {
+        text-align: center;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+      }
+
+      .stat-value {
         font-size: 24px;
         font-weight: bold;
-        color: #333;
+        color: #007bff;
         margin-bottom: 5px;
       }
 
-      .weekday {
+      .stat-label {
+        color: #666;
         font-size: 14px;
       }
+
+      .btn-warning {
+        background-color: #ffc107;
+        color: #000;
+      }
+
+      .btn-warning:hover {
+        background-color: #e0a800;
+      }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
   </head>
   <body>
     <header class="header">
-      <div class="user-info">
-        <span class="user-name" id="userName">加载中...</span>
-        <span class="user-role" id="userRole">加载中...</span>
+      <div class="store-info">
+        <span id="storeName">正在加载店铺信息...</span>
       </div>
-      <button class="logout-btn" onclick="logout()">退出登录</button>
+      <div>
+        <a href="select-store.html" class="btn btn-back">切换店铺</a>
+        <button onclick="logout()" class="btn btn-back">退出登录</button>
+      </div>
     </header>
 
-    <div class="store-info">
-      <div class="store-details">
-        <div>
-          <div class="store-name" id="storeName">加载中...</div>
-          <div class="store-address" id="storeAddress">加载中...</div>
+    <div class="container">
+      <!-- 今日盘点状态 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">今日盘点状态</h2>
         </div>
-        <span class="store-type-badge" id="storeType">加载中...</span>
+        <div class="inventory-status">
+          <div class="status-item">
+            <div class="status-text">
+              <span class="status-indicator" id="openingStatus"></span>
+              开店盘点
+            </div>
+            <span class="status-time" id="openingTime">未完成</span>
+          </div>
+          <div class="status-item">
+            <div class="status-text">
+              <span class="status-indicator" id="restockingStatus"></span>
+              进货盘点
+            </div>
+            <span class="status-time" id="restockingTime">未完成</span>
+          </div>
+          <div class="status-item">
+            <div class="status-text">
+              <span class="status-indicator" id="closingStatus"></span>
+              闭店盘点
+            </div>
+            <span class="status-time" id="closingTime">未完成</span>
+          </div>
+        </div>
+        <div style="margin-top: 15px">
+          <a
+            href="inventory-check.html"
+            class="btn btn-primary"
+            style="width: 100%"
+            >进入盘点页面</a
+          >
+        </div>
       </div>
-      <div class="date-info">
-        <div class="current-date" id="currentDate">加载中...</div>
-        <div class="weekday" id="weekday">加载中...</div>
-      </div>
-    </div>
 
-    <div class="dashboard-grid">
-      <div class="dashboard-card" onclick="navigateToInventory('morning')">
-        <div class="card-icon morning">🌅</div>
-        <h2 class="card-title">开店盘点</h2>
-        <p class="card-description">
-          记录开店时的库存情况，<br />确保新的一天营业准备就绪
-        </p>
+      <!-- 库存预警 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">库存预警</h2>
+        </div>
+        <div id="alertsList">
+          <!-- 将通过 JavaScript 动态填充 -->
+        </div>
       </div>
 
-      <div class="dashboard-card" onclick="navigateToInventory('afternoon')">
-        <div class="card-icon afternoon">📦</div>
-        <h2 class="card-title">进货盘点</h2>
-        <p class="card-description">
-          记录进货数量和类型，<br />实时更新库存信息
-        </p>
+      <!-- 快捷操作 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">快捷操作</h2>
+        </div>
+        <div class="quick-actions">
+          <a href="products.html" class="btn btn-primary">商品管理</a>
+          <a href="inventory-check.html?type=opening" class="btn btn-success"
+            >开店盘点</a
+          >
+          <a href="inventory-check.html?type=restocking" class="btn btn-primary"
+            >进货盘点</a
+          >
+          <a href="inventory-check.html?type=closing" class="btn btn-danger"
+            >闭店盘点</a
+          >
+          <a href="product-loss.html" class="btn btn-warning">商品报损</a>
+        </div>
       </div>
 
-      <div class="dashboard-card" onclick="navigateToInventory('evening')">
-        <div class="card-icon evening">🌙</div>
-        <h2 class="card-title">闭店盘点</h2>
-        <p class="card-description">统计当天销售情况，<br />核对剩余库存数量</p>
+      <!-- 今日统计 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">今日统计</h2>
+        </div>
+        <div class="statistics">
+          <div class="stat-item">
+            <div class="stat-value" id="totalProducts">-</div>
+            <div class="stat-label">商品总数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="lowStock">-</div>
+            <div class="stat-label">库存预警</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="todayChecks">-</div>
+            <div class="stat-label">今日盘点</div>
+          </div>
+        </div>
       </div>
     </div>
 
     <script>
-      // 获取店铺数据
-      const stores = {
-        direct: [
-          {
-            id: "d1",
-            name: "食圈儿神仙树",
-            address: "成都市神仙树地铁站内",
-            status: "open",
-          },
-          {
-            id: "d2",
-            name: "食圈儿华府大道",
-            address: "成都市华府大道地铁站",
-            status: "open",
-          },
-        ],
-        franchise: [
-          {
-            id: "f1",
-            name: "食圈儿",
-            address: "成都市昭觉寺南地铁站",
-            status: "open",
-          },
-        ],
-      };
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
 
-      // 格式化日期
-      function formatDate(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
-        return `${year}年${month}月${day}日`;
-      }
-
-      // 获取星期几
-      function getWeekday(date) {
-        const weekdays = [
-          "星期日",
-          "星期一",
-          "星期二",
-          "星期三",
-          "星期四",
-          "星期五",
-          "星期六",
-        ];
-        return weekdays[date.getDay()];
-      }
-
-      // 更新日期显示
-      function updateDateDisplay() {
-        const now = new Date();
-        document.getElementById("currentDate").textContent = formatDate(now);
-        document.getElementById("weekday").textContent = getWeekday(now);
-      }
-
-      // 获取店铺信息
-      function getStoreInfo(storeId, storeType) {
-        const storeList = stores[storeType];
-        return storeList.find((store) => store.id === storeId);
-      }
-
-      // 检查用户和店铺认证
-      function checkAuth() {
-        const user = JSON.parse(localStorage.getItem("user"));
-        const selectedStore = JSON.parse(localStorage.getItem("selectedStore"));
-
-        if (!user) {
+      // 检查登录状态
+      async function checkLogin() {
+        const currentUser = AV.User.current();
+        if (!currentUser) {
           window.location.href = "index.html";
           return;
         }
-
-        if (!selectedStore) {
-          window.location.href = "select-store.html";
-          return;
-        }
-
-        // 更新用户信息显示
-        document.getElementById("userName").textContent = user.name;
-        document.getElementById("userRole").textContent =
-          user.role === "admin" ? "管理员" : "员工";
-
-        // 更新店铺信息显示
-        const store = getStoreInfo(selectedStore.id, selectedStore.type);
-        if (store) {
-          document.getElementById("storeName").textContent = store.name;
-          document.getElementById("storeAddress").textContent = store.address;
-          const storeTypeBadge = document.getElementById("storeType");
-          storeTypeBadge.textContent =
-            selectedStore.type === "direct" ? "自营店" : "加盟店";
-          storeTypeBadge.className = `store-type-badge type-${selectedStore.type}`;
-        }
-
-        // 更新日期显示
-        updateDateDisplay();
+        return currentUser;
       }
 
-      // 处理登出
-      function logout() {
-        localStorage.removeItem("user");
-        localStorage.removeItem("selectedStore");
-        window.location.href = "index.html";
+      // 获取今日盘点状态
+      async function getTodayInventoryStatus() {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          const query = new AV.Query("InventoryCheck");
+          query.greaterThanOrEqualTo("date", today);
+          query.lessThan(
+            "date",
+            new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          );
+          const checks = await query.find();
+
+          checks.forEach((check) => {
+            const type = check.get("type");
+            const date = check.get("date");
+            const timeStr = date.toLocaleTimeString();
+
+            document
+              .getElementById(`${type}Status`)
+              .classList.add("status-done");
+            document.getElementById(
+              `${type}Time`
+            ).textContent = `完成于 ${timeStr}`;
+          });
+
+          document.getElementById("todayChecks").textContent = checks.length;
+        } catch (error) {
+          console.error("获取盘点状态失败:", error);
+        }
       }
 
-      // Navigate to inventory page
-      function navigateToInventory(type) {
-        const typeNames = {
-          morning: "开店",
-          afternoon: "进货",
-          evening: "闭店",
-        };
+      // 获取库存预警
+      async function getInventoryAlerts() {
+        try {
+          const query = new AV.Query("Product");
+          const products = await query.find();
+          const alerts = [];
 
-        alert(`即将前往${typeNames[type]}盘点页面`);
-        // window.location.href = `inventory-${type}.html`;
+          products.forEach((product) => {
+            const name = product.get("name");
+            // 这里的逻辑后续需要根据实际的库存数据来判断
+            // 现在先模拟一些预警
+            if (Math.random() < 0.3) {
+              alerts.push(`${name} 库存不足`);
+            }
+          });
+
+          const alertsList = document.getElementById("alertsList");
+          if (alerts.length > 0) {
+            alertsList.innerHTML = alerts
+              .map((alert) => `<div class="alert-card">${alert}</div>`)
+              .join("");
+          } else {
+            alertsList.innerHTML = '<div class="alert-card">暂无库存预警</div>';
+          }
+
+          document.getElementById("lowStock").textContent = alerts.length;
+        } catch (error) {
+          console.error("获取库存预警失败:", error);
+        }
+      }
+
+      // 获取商品统计
+      async function getProductStats() {
+        try {
+          const query = new AV.Query("Product");
+          const count = await query.count();
+          document.getElementById("totalProducts").textContent = count;
+        } catch (error) {
+          console.error("获取商品统计失败:", error);
+        }
+      }
+
+      // 登出功能
+      async function logout() {
+        try {
+          await AV.User.logOut();
+          localStorage.removeItem("user");
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("登出失败:", error);
+          alert("登出失败，请重试");
+        }
       }
 
       // 页面加载时执行
-      checkAuth();
+      window.onload = async function () {
+        const currentUser = await checkLogin();
+        if (!currentUser) return;
 
-      // 每分钟更新一次日期显示
-      setInterval(updateDateDisplay, 60000);
+        // 设置店铺名称
+        const userData = JSON.parse(localStorage.getItem("user") || "{}");
+        document.getElementById("storeName").textContent = userData.name
+          ? `${userData.name} - 工作台`
+          : "工作台";
+
+        // 加载各项数据
+        getTodayInventoryStatus();
+        getInventoryAlerts();
+        getProductStats();
+      };
     </script>
   </body>
 </html>
