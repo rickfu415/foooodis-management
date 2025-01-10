@@ -152,6 +152,14 @@
     </div>
 
     <script>
+      // 页面加载时检查是否有保存的用户名
+      window.addEventListener("load", function () {
+        const savedUsername = localStorage.getItem("lastUsername");
+        if (savedUsername) {
+          document.getElementById("username").value = savedUsername;
+        }
+      });
+
       document
         .getElementById("loginForm")
         .addEventListener("submit", async function (e) {
@@ -165,6 +173,9 @@
           // Get form values
           const username = document.getElementById("username").value.trim();
           const password = document.getElementById("password").value.trim();
+
+          // 保存用户名到 localStorage
+          localStorage.setItem("lastUsername", username);
 
           // Validate username
           if (username.length < 3) {
