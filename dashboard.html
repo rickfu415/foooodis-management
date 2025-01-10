@@ -313,25 +313,49 @@
           const today = new Date();
           today.setHours(0, 0, 0, 0);
 
+          // 获取当前店铺信息
+          const storeData = JSON.parse(
+            localStorage.getItem("selectedStore") || "{}"
+          );
+          if (!storeData.id) {
+            console.error("未选择店铺");
+            return;
+          }
+
           const query = new AV.Query("InventoryCheck");
           query.greaterThanOrEqualTo("date", today);
           query.lessThan(
             "date",
             new Date(today.getTime() + 24 * 60 * 60 * 1000)
           );
+          query.equalTo("storeId", storeData.id); // 添加店铺筛选
+          query.include("operator"); // 包含操作员信息
           const checks = await query.find();
 
+          // 重置所有状态为未完成
+          document
+            .querySelectorAll(".status-indicator")
+            .forEach((indicator) => {
+              indicator.classList.remove("status-done");
+            });
+          document.querySelectorAll(".status-time").forEach((time) => {
+            time.textContent = "未完成";
+          });
+
+          // 更新已完成的盘点状态
           checks.forEach((check) => {
             const type = check.get("type");
             const date = check.get("date");
+            const operator = check.get("operator");
             const timeStr = date.toLocaleTimeString();
+            const operatorName = operator ? operator.get("name") : "未知";
 
             document
               .getElementById(`${type}Status`)
               .classList.add("status-done");
             document.getElementById(
               `${type}Time`
-            ).textContent = `完成于 ${timeStr}`;
+            ).textContent = `完成于 ${timeStr} (${operatorName})`;
           });
 
           document.getElementById("todayChecks").textContent = checks.length;
