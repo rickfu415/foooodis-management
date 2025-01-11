@@ -210,6 +210,17 @@
             return;
           }
 
+          // 获取所有商品信息
+          const productQuery = new AV.Query("Product");
+          const products = await productQuery.find();
+          const productMap = {};
+          products.forEach((product) => {
+            productMap[product.id] = {
+              name: product.get("name"),
+              category: product.get("category"),
+            };
+          });
+
           // 获取今日所有盘点记录
           const query = new AV.Query("InventoryCheck");
           query.equalTo("storeId", storeData.id);
@@ -231,21 +242,30 @@
           checks.forEach((check) => {
             const items = check.get("items") || [];
             items.forEach((item) => {
-              if (item.category === "drinks") {
-                currentStock.drinks[item.productId] = item.quantity;
-              } else if (item.category === "bakery") {
-                currentStock.bakery[item.productId] = item.quantity;
+              const productInfo = productMap[item.product.objectId];
+              if (!productInfo) return;
+
+              if (productInfo.category === "drinks") {
+                currentStock.drinks[item.product.objectId] = {
+                  quantity: item.quantity,
+                  name: productInfo.name,
+                };
+              } else if (productInfo.category === "bakery") {
+                currentStock.bakery[item.product.objectId] = {
+                  quantity: item.quantity,
+                  name: productInfo.name,
+                };
               }
             });
           });
 
           // 计算当前总库存
           const drinksStock = Object.values(currentStock.drinks).reduce(
-            (sum, quantity) => sum + quantity,
+            (sum, item) => sum + item.quantity,
             0
           );
           const bakeryStock = Object.values(currentStock.bakery).reduce(
-            (sum, quantity) => sum + quantity,
+            (sum, item) => sum + item.quantity,
             0
           );
 
@@ -255,14 +275,16 @@
 
           // 更新库存详情
           const drinksDetails = Object.entries(currentStock.drinks)
-            .map(([productId, quantity]) => `${productId}: ${quantity}`)
+            .map(([id, item]) => `${item.name}: ${item.quantity}`)
             .join("<br>");
           const bakeryDetails = Object.entries(currentStock.bakery)
-            .map(([productId, quantity]) => `${productId}: ${quantity}`)
+            .map(([id, item]) => `${item.name}: ${item.quantity}`)
             .join("<br>");
 
-          document.getElementById("drinksDetails").innerHTML = drinksDetails;
-          document.getElementById("bakeryDetails").innerHTML = bakeryDetails;
+          document.getElementById("drinksDetails").innerHTML =
+            drinksDetails || "暂无库存";
+          document.getElementById("bakeryDetails").innerHTML =
+            bakeryDetails || "暂无库存";
         } catch (error) {
           console.error("获取库存数据失败:", error);
         }
