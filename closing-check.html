@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>闭店盘点 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .container {
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .section-title {
+        font-size: 18px;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+      }
+
+      .inventory-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      .inventory-table th,
+      .inventory-table td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        text-align: left;
+      }
+
+      .inventory-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+      }
+
+      .inventory-table input {
+        width: 80px;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .note-field {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .history-section {
+        margin-top: 30px;
+      }
+
+      .history-item {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        color: #666;
+        font-size: 14px;
+      }
+
+      .history-content {
+        margin-top: 10px;
+      }
+
+      .history-product {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <a href="dashboard.html" class="btn btn-back">返回工作台</a>
+      <span>闭店盘点</span>
+      <button onclick="logout()" class="btn btn-back">退出登录</button>
+    </header>
+
+    <div class="container">
+      <!-- 闭店盘点表单 -->
+      <div class="inventory-form">
+        <h3 class="section-title">闭店盘点</h3>
+        <div class="form-group">
+          <label>盘点日期</label>
+          <input type="datetime-local" id="checkDate" required />
+        </div>
+        <table class="inventory-table">
+          <thead>
+            <tr>
+              <th>商品名称</th>
+              <th>类别</th>
+              <th>实际库存</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryList">
+            <!-- 将通过 JavaScript 动态填充 -->
+          </tbody>
+        </table>
+        <button
+          class="btn btn-primary"
+          onclick="submitInventoryCheck()"
+          style="margin-top: 20px"
+        >
+          提交闭店盘点
+        </button>
+      </div>
+
+      <!-- 历史记录 -->
+      <div class="history-section">
+        <h3 class="section-title">今日闭店盘点记录</h3>
+        <div id="historyList">
+          <!-- 将通过 JavaScript 动态填充 -->
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 设置默认日期为今天
+      function setDefaultDate() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        document.getElementById(
+          "checkDate"
+        ).value = `${year}-${month}-${day}T${hours}:${minutes}`;
+      }
+
+      // 加载商品列表
+      async function loadProductList() {
+        try {
+          const query = new AV.Query("Product");
+          const products = await query.find();
+
+          const listElement = document.getElementById("inventoryList");
+          const productRows = products.map((product) => {
+            const name = product.get("name");
+            const category =
+              product.get("category") === "drinks" ? "饮品" : "烘焙";
+
+            return `
+              <tr data-id="${product.id}">
+                <td>${name}</td>
+                <td>${category}</td>
+                <td>
+                  <input type="number" min="0" class="stock-count" />
+                </td>
+                <td>
+                  <input type="text" class="note-field" placeholder="填写备注..." />
+                </td>
+              </tr>
+            `;
+          });
+
+          listElement.innerHTML = productRows.join("");
+        } catch (error) {
+          console.error("加载商品列表失败:", error);
+          alert("加载商品列表失败，请重试");
+        }
+      }
+
+      // 加载今日盘点历史
+      async function loadTodayHistory() {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          // 获取当前店铺信息
+          const storeData = JSON.parse(
+            localStorage.getItem("selectedStore") || "{}"
+          );
+          if (!storeData.id) {
+            console.error("未选择店铺");
+            return;
+          }
+
+          const query = new AV.Query("InventoryCheck");
+          query.equalTo("type", "closing");
+          query.equalTo("storeId", storeData.id);
+          query.greaterThanOrEqualTo("date", today);
+          query.lessThan(
+            "date",
+            new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          );
+          query.include("operator");
+          query.descending("createdAt");
+
+          const checks = await query.find();
+          const historyElement = document.getElementById("historyList");
+
+          if (checks.length === 0) {
+            historyElement.innerHTML =
+              '<div class="history-item">今日暂无闭店盘点记录</div>';
+            return;
+          }
+
+          historyElement.innerHTML = checks
+            .map((check) => {
+              const date = check.get("date");
+              const operator = check.get("operator");
+              const items = check.get("items");
+              const timeStr = date.toLocaleTimeString("zh-CN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              });
+              const operatorName = operator ? operator.get("name") : "未知";
+
+              return `
+              <div class="history-item">
+                <div class="history-header">
+                  <span>盘点时间：${timeStr}</span>
+                  <span>操作人：${operatorName}</span>
+                </div>
+                <div class="history-content">
+                  ${items
+                    .map(
+                      (item) => `
+                    <div class="history-product">
+                      <span>${item.productName || "未知商品"}</span>
+                      <span>
+                        ${item.quantity}个
+                        ${item.note ? `(${item.note})` : ""}
+                      </span>
+                    </div>
+                  `
+                    )
+                    .join("")}
+                </div>
+              </div>
+            `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载历史记录失败:", error);
+          alert("加载历史记录失败，请重试");
+        }
+      }
+
+      // 提交盘点记录
+      async function submitInventoryCheck() {
+        try {
+          const currentUser = AV.User.current();
+          if (!currentUser) {
+            alert("请先登录");
+            window.location.href = "index.html";
+            return;
+          }
+
+          const date = document.getElementById("checkDate").value;
+          const items = [];
+          let hasItems = false;
+
+          // 获取店铺信息
+          const storeData = JSON.parse(
+            localStorage.getItem("selectedStore") || "{}"
+          );
+          if (!storeData.id) {
+            alert("未选择店铺");
+            window.location.href = "select-store.html";
+            return;
+          }
+
+          // 收集表单数据
+          document.querySelectorAll("#inventoryList tr").forEach((row) => {
+            const productId = row.dataset.id;
+            const quantity =
+              parseInt(row.querySelector(".stock-count").value) || 0;
+            const note = row.querySelector(".note-field").value;
+            const productName = row.querySelector("td").textContent;
+
+            if (quantity > 0) {
+              hasItems = true;
+              items.push({
+                product: {
+                  __type: "Pointer",
+                  className: "Product",
+                  objectId: productId,
+                },
+                quantity: quantity,
+                note: note,
+                productName: productName,
+              });
+            }
+          });
+
+          if (!hasItems) {
+            alert("请至少输入一件商品的实际库存");
+            return;
+          }
+
+          // 显示确认对话框
+          if (!confirm("确认提交盘点记录吗？提交后将返回工作台。")) {
+            return;
+          }
+
+          // 创建盘点记录
+          const InventoryCheck = AV.Object.extend("InventoryCheck");
+          const check = new InventoryCheck();
+
+          check.set("type", "closing");
+          check.set("date", new Date(date));
+          check.set("items", items);
+          check.set("operator", currentUser);
+          check.set("status", "submitted");
+          check.set("storeId", storeData.id);
+          check.set("storeName", storeData.name);
+
+          await check.save();
+          alert("闭店盘点记录提交成功！");
+
+          // 提交成功后返回工作台
+          window.location.href = "dashboard.html";
+        } catch (error) {
+          console.error("提交盘点记录失败:", error);
+          alert(error.message || "提交失败，请重试");
+        }
+      }
+
+      // 登出功能
+      async function logout() {
+        try {
+          await AV.User.logOut();
+          localStorage.removeItem("user");
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("登出失败:", error);
+          alert("登出失败，请重试");
+        }
+      }
+
+      // 页面加载时执行
+      window.onload = function () {
+        setDefaultDate();
+        loadProductList();
+        loadTodayHistory();
+      };
+    </script>
+  </body>
+</html>

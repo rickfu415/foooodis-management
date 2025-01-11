@@ -199,54 +199,6 @@
     </header>
 
     <div class="container">
-      <!-- 今日盘点状态 -->
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">今日盘点状态</h2>
-        </div>
-        <div class="inventory-status">
-          <div class="status-item">
-            <div class="status-text">
-              <span class="status-indicator" id="openingStatus"></span>
-              开店盘点
-            </div>
-            <span class="status-time" id="openingTime">未完成</span>
-          </div>
-          <div class="status-item">
-            <div class="status-text">
-              <span class="status-indicator" id="restockingStatus"></span>
-              进货盘点
-            </div>
-            <span class="status-time" id="restockingTime">未完成</span>
-          </div>
-          <div class="status-item">
-            <div class="status-text">
-              <span class="status-indicator" id="closingStatus"></span>
-              闭店盘点
-            </div>
-            <span class="status-time" id="closingTime">未完成</span>
-          </div>
-        </div>
-        <div style="margin-top: 15px">
-          <a
-            href="inventory-check.html"
-            class="btn btn-primary"
-            style="width: 100%"
-            >进入盘点页面</a
-          >
-        </div>
-      </div>
-
-      <!-- 库存预警 -->
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">库存预警</h2>
-        </div>
-        <div id="alertsList">
-          <!-- 将通过 JavaScript 动态填充 -->
-        </div>
-      </div>
-
       <!-- 快捷操作 -->
       <div class="card">
         <div class="card-header">
@@ -254,15 +206,9 @@
         </div>
         <div class="quick-actions">
           <a href="products.html" class="btn btn-primary">商品管理</a>
-          <a href="inventory-check.html?type=opening" class="btn btn-success"
-            >开店盘点</a
-          >
-          <a href="inventory-check.html?type=restocking" class="btn btn-primary"
-            >进货盘点</a
-          >
-          <a href="inventory-check.html?type=closing" class="btn btn-danger"
-            >闭店盘点</a
-          >
+          <a href="opening-check.html" class="btn btn-success">开店盘点</a>
+          <a href="restocking-check.html" class="btn btn-primary">进货盘点</a>
+          <a href="closing-check.html" class="btn btn-danger">闭店盘点</a>
           <a href="product-loss.html" class="btn btn-warning">商品报损</a>
         </div>
       </div>
@@ -284,6 +230,30 @@
           <div class="stat-item">
             <div class="stat-value" id="todayChecks">-</div>
             <div class="stat-label">今日盘点</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 今日盘点状态 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">今日盘点状态</h2>
+        </div>
+        <div class="inventory-status">
+          <div class="status-item">
+            <div class="status-indicator" id="openingStatus"></div>
+            <div class="status-label">开店盘点</div>
+            <div class="status-time" id="openingTime">未完成</div>
+          </div>
+          <div class="status-item">
+            <div class="status-indicator" id="restockingStatus"></div>
+            <div class="status-label">进货盘点</div>
+            <div class="status-time" id="restockingTime">未完成</div>
+          </div>
+          <div class="status-item">
+            <div class="status-indicator" id="closingStatus"></div>
+            <div class="status-label">闭店盘点</div>
+            <div class="status-time" id="closingTime">未完成</div>
           </div>
         </div>
       </div>
