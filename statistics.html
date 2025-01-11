@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>今日统计 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        color: white;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+      }
+
+      .container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .card-title {
+        font-size: 18px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+      }
+
+      .stat-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+        margin: 10px 0;
+      }
+
+      .stat-label {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .category-label {
+        color: #333;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      .inventory-details {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #666;
+      }
+
+      .trend-indicator {
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-left: 8px;
+      }
+
+      .trend-up {
+        background-color: #d4edda;
+        color: #155724;
+      }
+
+      .trend-down {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+
+      @media (max-width: 768px) {
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <a href="dashboard.html" class="btn btn-back">返回工作台</a>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- 库存概览 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">库存概览</h2>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="category-label">饮品</div>
+            <div class="stat-value" id="drinksStock">-</div>
+            <div class="stat-label">当前库存</div>
+            <div class="inventory-details" id="drinksDetails"></div>
+          </div>
+          <div class="stat-card">
+            <div class="category-label">烘焙</div>
+            <div class="stat-value" id="bakeryStock">-</div>
+            <div class="stat-label">当前库存</div>
+            <div class="inventory-details" id="bakeryDetails"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 今日销售 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">今日销售</h2>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="category-label">饮品</div>
+            <div class="stat-value" id="drinksSold">-</div>
+            <div class="stat-label">销售数量</div>
+          </div>
+          <div class="stat-card">
+            <div class="category-label">烘焙</div>
+            <div class="stat-value" id="bakerySold">-</div>
+            <div class="stat-label">销售数量</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 监听库存更新
+      window.addEventListener("storage", function (e) {
+        if (e.key === "inventoryUpdated") {
+          getInventoryData();
+        }
+      });
+
+      // 获取今日库存数据
+      async function getInventoryData() {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          // 获取当前店铺信息
+          const storeData = JSON.parse(
+            localStorage.getItem("selectedStore") || "{}"
+          );
+          if (!storeData.id) {
+            console.error("未选择店铺");
+            return;
+          }
+
+          // 获取今日所有盘点记录
+          const query = new AV.Query("InventoryCheck");
+          query.equalTo("storeId", storeData.id);
+          query.greaterThanOrEqualTo("date", today);
+          query.lessThan(
+            "date",
+            new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          );
+          query.ascending("date"); // 按时间顺序排序
+          const checks = await query.find();
+
+          // 用于存储每种商品的最新库存
+          const currentStock = {
+            drinks: {}, // 用于存储每个饮品的最新库存
+            bakery: {}, // 用于存储每个烘焙品的最新库存
+          };
+
+          // 处理所有盘点记录，按时间顺序更新库存
+          checks.forEach((check) => {
+            const items = check.get("items") || [];
+            items.forEach((item) => {
+              if (item.category === "drinks") {
+                currentStock.drinks[item.productId] = item.quantity;
+              } else if (item.category === "bakery") {
+                currentStock.bakery[item.productId] = item.quantity;
+              }
+            });
+          });
+
+          // 计算当前总库存
+          const drinksStock = Object.values(currentStock.drinks).reduce(
+            (sum, quantity) => sum + quantity,
+            0
+          );
+          const bakeryStock = Object.values(currentStock.bakery).reduce(
+            (sum, quantity) => sum + quantity,
+            0
+          );
+
+          // 更新库存显示
+          document.getElementById("drinksStock").textContent = drinksStock;
+          document.getElementById("bakeryStock").textContent = bakeryStock;
+
+          // 更新库存详情
+          const drinksDetails = Object.entries(currentStock.drinks)
+            .map(([productId, quantity]) => `${productId}: ${quantity}`)
+            .join("<br>");
+          const bakeryDetails = Object.entries(currentStock.bakery)
+            .map(([productId, quantity]) => `${productId}: ${quantity}`)
+            .join("<br>");
+
+          document.getElementById("drinksDetails").innerHTML = drinksDetails;
+          document.getElementById("bakeryDetails").innerHTML = bakeryDetails;
+        } catch (error) {
+          console.error("获取库存数据失败:", error);
+        }
+      }
+
+      // 页面加载时执行
+      window.onload = function () {
+        getInventoryData();
+        // 每分钟刷新一次数据
+        setInterval(getInventoryData, 60000);
+      };
+    </script>
+  </body>
+</html>

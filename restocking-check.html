@@ -156,9 +156,9 @@
   </head>
   <body>
     <header class="header">
-      <a href="dashboard.html" class="btn btn-back">返回工作台</a>
-      <span>进货盘点</span>
-      <button onclick="logout()" class="btn btn-back">退出登录</button>
+      <div>
+        <a href="dashboard.html" class="btn btn-back">返回工作台</a>
+      </div>
     </header>
 
     <div class="container">
@@ -459,13 +459,12 @@
           check.set("storeName", storeData.name);
 
           await check.save();
-          alert("进货盘点记录提交成功！");
-
-          // 提交成功后返回工作台
+          // 提交成功后直接返回工作台
+          localStorage.setItem("inventoryUpdated", new Date().getTime());
           window.location.href = "dashboard.html";
         } catch (error) {
           console.error("提交盘点记录失败:", error);
-          alert(error.message || "提交失败，请重试");
+          alert("提交失败，请重试");
         }
       }
 

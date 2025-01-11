@@ -151,9 +151,9 @@
   </head>
   <body>
     <header class="header">
-      <a href="dashboard.html" class="btn btn-back">返回工作台</a>
-      <span>商品报损</span>
-      <button onclick="logout()" class="btn btn-back">退出登录</button>
+      <div>
+        <a href="dashboard.html" class="btn btn-back">返回工作台</a>
+      </div>
     </header>
 
     <div class="container">
@@ -344,11 +344,8 @@
           loss.set("operator", currentUser);
 
           await loss.save();
-
-          alert("报损记录提交成功！");
-          // 重新加载数据
-          loadProductList();
-          loadLossHistory();
+          // 提交成功后直接返回工作台
+          window.location.href = "dashboard.html";
         } catch (error) {
           console.error("提交报损记录失败:", error);
           alert(error.message || "提交失败，请重试");
