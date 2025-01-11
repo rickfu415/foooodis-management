@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>清理数据</title>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <h1>清理数据</h1>
+    <button onclick="clearData()">清理今日数据</button>
+    <div id="result"></div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      async function clearData() {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          // 获取当前店铺信息
+          const storeData = JSON.parse(
+            localStorage.getItem("selectedStore") || "{}"
+          );
+          if (!storeData.id) {
+            document.getElementById("result").textContent = "未选择店铺";
+            return;
+          }
+
+          // 查询今日所有盘点记录
+          const query = new AV.Query("InventoryCheck");
+          query.equalTo("storeId", storeData.id);
+          query.greaterThanOrEqualTo("date", today);
+          query.lessThan(
+            "date",
+            new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          );
+
+          const records = await query.find();
+
+          // 删除记录
+          await AV.Object.destroyAll(records);
+
+          document.getElementById(
+            "result"
+          ).textContent = `成功删除 ${records.length} 条记录`;
+
+          // 更新localStorage以触发统计页面刷新
+          localStorage.setItem("inventoryUpdated", new Date().getTime());
+        } catch (error) {
+          document.getElementById("result").textContent =
+            "清理失败: " + error.message;
+          console.error("清理失败:", error);
+        }
+      }
+    </script>
+  </body>
+</html>

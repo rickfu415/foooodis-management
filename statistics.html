@@ -128,6 +128,72 @@
           grid-template-columns: 1fr;
         }
       }
+
+      .product-details {
+        margin-top: 10px;
+        overflow-x: auto;
+      }
+
+      .details-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .details-table th,
+      .details-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+      }
+
+      .details-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        color: #333;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+      }
+
+      .details-table th:hover {
+        background-color: #e9ecef;
+      }
+
+      .details-table th::after {
+        content: "";
+        display: inline-block;
+        width: 0;
+        height: 0;
+        margin-left: 8px;
+        vertical-align: middle;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+      }
+
+      .details-table th.sort-asc::after {
+        border-bottom: 4px solid #333;
+        border-top: none;
+      }
+
+      .details-table th.sort-desc::after {
+        border-top: 4px solid #333;
+        border-bottom: none;
+      }
+
+      .details-table tr:hover {
+        background-color: #f8f9fa;
+      }
+
+      @media (max-width: 768px) {
+        .details-table {
+          font-size: 14px;
+        }
+
+        .details-table th,
+        .details-table td {
+          padding: 8px;
+        }
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
   </head>
@@ -178,6 +244,28 @@
           </div>
         </div>
       </div>
+
+      <!-- 商品明细 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">商品明细</h2>
+        </div>
+        <div class="product-details">
+          <table class="details-table">
+            <thead>
+              <tr>
+                <th data-sort="name">商品名称</th>
+                <th data-sort="category">类别</th>
+                <th data-sort="stock">当前库存</th>
+                <th data-sort="sales">销售数量</th>
+              </tr>
+            </thead>
+            <tbody id="productDetailsList">
+              <!-- 将通过 JavaScript 动态填充 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -195,6 +283,86 @@
         }
       });
 
+      // 添加排序状态变量
+      let sortConfig = {
+        column: "name",
+        direction: "asc",
+      };
+
+      // 添加排序函数
+      function sortProductData(data, column, direction) {
+        return data.sort((a, b) => {
+          let aValue, bValue;
+
+          switch (column) {
+            case "name":
+              aValue = a[1].name;
+              bValue = b[1].name;
+              break;
+            case "category":
+              aValue = a[1].category === "drinks" ? "饮品" : "烘焙";
+              bValue = b[1].category === "drinks" ? "饮品" : "烘焙";
+              break;
+            case "stock":
+              aValue = a[1].currentStock;
+              bValue = b[1].currentStock;
+              break;
+            case "sales":
+              aValue = Math.max(
+                0,
+                a[1].openingStock + a[1].restockQuantity - a[1].currentStock
+              );
+              bValue = Math.max(
+                0,
+                b[1].openingStock + b[1].restockQuantity - b[1].currentStock
+              );
+              break;
+            default:
+              return 0;
+          }
+
+          if (typeof aValue === "number") {
+            return direction === "asc" ? aValue - bValue : bValue - aValue;
+          } else {
+            return direction === "asc"
+              ? aValue.localeCompare(bValue, "zh-CN")
+              : bValue.localeCompare(aValue, "zh-CN");
+          }
+        });
+      }
+
+      // 更新表头样式
+      function updateTableHeaders() {
+        const headers = document.querySelectorAll(".details-table th");
+        headers.forEach((header) => {
+          const column = header.dataset.sort;
+          header.classList.remove("sort-asc", "sort-desc");
+          if (column === sortConfig.column) {
+            header.classList.add(
+              sortConfig.direction === "asc" ? "sort-asc" : "sort-desc"
+            );
+          }
+        });
+      }
+
+      // 添加表头点击事件
+      document.addEventListener("DOMContentLoaded", function () {
+        const headers = document.querySelectorAll(".details-table th");
+        headers.forEach((header) => {
+          header.addEventListener("click", function () {
+            const column = this.dataset.sort;
+            if (sortConfig.column === column) {
+              sortConfig.direction =
+                sortConfig.direction === "asc" ? "desc" : "asc";
+            } else {
+              sortConfig.column = column;
+              sortConfig.direction = "asc";
+            }
+            getInventoryData(); // 重新获取并显示数据
+          });
+        });
+      });
+
       // 获取今日库存数据
       async function getInventoryData() {
         try {
@@ -210,14 +378,21 @@
             return;
           }
 
+          console.log("开始获取数据，店铺ID:", storeData.id);
+
           // 获取所有商品信息
           const productQuery = new AV.Query("Product");
           const products = await productQuery.find();
+          console.log("获取到商品:", products.length, "个");
+
           const productMap = {};
           products.forEach((product) => {
             productMap[product.id] = {
               name: product.get("name"),
               category: product.get("category"),
+              currentStock: 0,
+              openingStock: 0,
+              restockQuantity: 0,
             };
           });
 
@@ -229,62 +404,120 @@
             "date",
             new Date(today.getTime() + 24 * 60 * 60 * 1000)
           );
-          query.ascending("date"); // 按时间顺序排序
+          query.include("items.product");
+          query.ascending("createdAt");
           const checks = await query.find();
+          console.log("获取到盘点记录:", checks.length, "条");
 
-          // 用于存储每种商品的最新库存
-          const currentStock = {
-            drinks: {}, // 用于存储每个饮品的最新库存
-            bakery: {}, // 用于存储每个烘焙品的最新库存
-          };
-
-          // 处理所有盘点记录，按时间顺序更新库存
+          // 处理所有盘点记录
           checks.forEach((check) => {
             const items = check.get("items") || [];
-            items.forEach((item) => {
-              const productInfo = productMap[item.product.objectId];
-              if (!productInfo) return;
+            const checkType = check.get("type");
+            console.log(
+              "处理盘点记录:",
+              checkType,
+              "包含商品:",
+              items.length,
+              "个"
+            );
 
-              if (productInfo.category === "drinks") {
-                currentStock.drinks[item.product.objectId] = {
-                  quantity: item.quantity,
-                  name: productInfo.name,
-                };
-              } else if (productInfo.category === "bakery") {
-                currentStock.bakery[item.product.objectId] = {
-                  quantity: item.quantity,
-                  name: productInfo.name,
-                };
+            items.forEach((item) => {
+              if (!item.product || !item.product.id) return;
+              const productId = item.product.id;
+              if (!productMap[productId]) return;
+
+              const quantity = item.quantity || 0;
+              console.log(
+                "商品:",
+                productMap[productId].name,
+                "数量:",
+                quantity
+              );
+
+              if (checkType === "opening") {
+                // 记录开店盘点数量
+                productMap[productId].openingStock = quantity;
+                productMap[productId].currentStock = quantity;
+                console.log("设置开店库存:", quantity);
+              } else if (checkType === "restocking") {
+                // 累加进货数量
+                productMap[productId].restockQuantity += quantity;
+                productMap[productId].currentStock += quantity;
+                console.log("累加进货数量:", quantity);
+              } else if (checkType === "closing") {
+                // 更新当前库存为闭店盘点数量
+                productMap[productId].currentStock = quantity;
+                console.log("更新闭店库存:", quantity);
               }
             });
           });
 
-          // 计算当前总库存
-          const drinksStock = Object.values(currentStock.drinks).reduce(
-            (sum, item) => sum + item.quantity,
-            0
-          );
-          const bakeryStock = Object.values(currentStock.bakery).reduce(
-            (sum, item) => sum + item.quantity,
-            0
+          // 将 productMap 转换为数组并排序
+          const productEntries = sortProductData(
+            Object.entries(productMap),
+            sortConfig.column,
+            sortConfig.direction
           );
 
-          // 更新库存显示
-          document.getElementById("drinksStock").textContent = drinksStock;
-          document.getElementById("bakeryStock").textContent = bakeryStock;
+          // 更新表头样式
+          updateTableHeaders();
 
-          // 更新库存详情
-          const drinksDetails = Object.entries(currentStock.drinks)
-            .map(([id, item]) => `${item.name}: ${item.quantity}`)
-            .join("<br>");
-          const bakeryDetails = Object.entries(currentStock.bakery)
-            .map(([id, item]) => `${item.name}: ${item.quantity}`)
-            .join("<br>");
+          // 更新商品明细表格
+          const detailsHtml = productEntries
+            .map(([id, product]) => {
+              const sales = Math.max(
+                0,
+                product.openingStock +
+                  product.restockQuantity -
+                  product.currentStock
+              );
+              return `
+                <tr>
+                  <td>${product.name}</td>
+                  <td>${product.category === "drinks" ? "饮品" : "烘焙"}</td>
+                  <td>${product.currentStock}</td>
+                  <td>${sales}</td>
+                </tr>
+              `;
+            })
+            .join("");
 
-          document.getElementById("drinksDetails").innerHTML =
-            drinksDetails || "暂无库存";
-          document.getElementById("bakeryDetails").innerHTML =
-            bakeryDetails || "暂无库存";
+          document.getElementById("productDetailsList").innerHTML = detailsHtml;
+
+          // 计算并更新总计数据
+          const totals = Object.values(productMap).reduce(
+            (acc, product) => {
+              if (product.category === "drinks") {
+                acc.drinksStock += product.currentStock;
+                acc.drinksSold += Math.max(
+                  0,
+                  product.openingStock +
+                    product.restockQuantity -
+                    product.currentStock
+                );
+              } else if (product.category === "bakery") {
+                acc.bakeryStock += product.currentStock;
+                acc.bakerySold += Math.max(
+                  0,
+                  product.openingStock +
+                    product.restockQuantity -
+                    product.currentStock
+                );
+              }
+              return acc;
+            },
+            { drinksStock: 0, drinksSold: 0, bakeryStock: 0, bakerySold: 0 }
+          );
+
+          console.log("统计结果:", totals);
+
+          // 更新显示
+          document.getElementById("drinksStock").textContent =
+            totals.drinksStock;
+          document.getElementById("bakeryStock").textContent =
+            totals.bakeryStock;
+          document.getElementById("drinksSold").textContent = totals.drinksSold;
+          document.getElementById("bakerySold").textContent = totals.bakerySold;
         } catch (error) {
           console.error("获取库存数据失败:", error);
         }
@@ -292,6 +525,7 @@
 
       // 页面加载时执行
       window.onload = function () {
+        console.log("页面加载，开始获取数据");
         getInventoryData();
         // 每分钟刷新一次数据
         setInterval(getInventoryData, 60000);
