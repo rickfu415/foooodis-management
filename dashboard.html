@@ -197,6 +197,27 @@
       .btn-info:hover {
         background-color: #138496;
       }
+
+      /* 店铺信息卡片样式 */
+      .store-card {
+        background: linear-gradient(135deg, #4a90e2, #357abd);
+        color: white;
+      }
+
+      .store-card-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .store-name {
+        font-size: 20px;
+        font-weight: bold;
+      }
+
+      .current-date {
+        font-size: 16px;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
   </head>
@@ -208,6 +229,16 @@
     </header>
 
     <div class="container">
+      <!-- 店铺信息卡片 -->
+      <div class="card store-card">
+        <div class="store-card-content">
+          <div class="store-name">
+            <span id="currentStoreName">加载中...</span>
+          </div>
+          <div class="current-date" id="currentDate"></div>
+        </div>
+      </div>
+
       <!-- 快捷操作 -->
       <div class="card">
         <div class="card-header">
@@ -399,6 +430,29 @@
       window.onload = async function () {
         await checkLogin();
         await getTodayInventoryStatus();
+        
+        // 显示店铺信息
+        const storeData = JSON.parse(localStorage.getItem("selectedStore") || "{}");
+        if (storeData.name) {
+          document.getElementById("currentStoreName").textContent = `${storeData.brand} ${storeData.name}`;
+        }
+
+        // 更新日期显示
+        function updateDate() {
+          const now = new Date();
+          const dateStr = now.toLocaleDateString('zh-CN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+          });
+          document.getElementById("currentDate").textContent = dateStr;
+        }
+        
+        updateDate();
+        // 每分钟更新一次日期
+        setInterval(updateDate, 60000);
+        
         // 每分钟刷新一次状态
         setInterval(getTodayInventoryStatus, 60000);
       };
