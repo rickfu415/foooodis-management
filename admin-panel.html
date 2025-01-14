@@ -655,111 +655,50 @@
       AV.init({
         appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
         appKey: "e4T5MriHgEYtmK7YPvV64awF",
-        masterKey: "0DaW0GhKUl3Obr5QR5A0xpCw",
         serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
       });
-
-      // 启用 masterKey，关闭 masterKey 签名验证
-      AV.Cloud.useMasterKey(true);
-
-      // 同步店铺数据到 LeanCloud
-      async function syncStores() {
-        try {
-          // 获取所有店铺数据
-          const stores = {
-            direct: [
-              {
-                id: "d1",
-                name: "神仙树",
-                brand: "食圈儿",
-                address: "成都市神仙树地铁站内",
-                status: "open",
-                type: "direct",
-              },
-              {
-                id: "d2",
-                name: "华府大道",
-                brand: "食圈儿",
-                address: "成都市华府大道地铁站",
-                status: "open",
-                type: "direct",
-              },
-            ],
-            franchise: [
-              {
-                id: "f1",
-                name: "昭觉寺南",
-                brand: "食圈儿",
-                address: "成都市昭觉寺南地铁站",
-                status: "open",
-                type: "franchise",
-              },
-            ],
-          };
-
-          // 查询现有店铺
-          const query = new AV.Query("Store");
-          const existingStores = await query.find();
-
-          // 删除所有现有店铺
-          await AV.Object.destroyAll(existingStores);
-
-          // 创建新的店铺记录
-          const allStores = [...stores.direct, ...stores.franchise];
-          const storeObjects = allStores.map((store) => {
-            const Store = AV.Object.extend("Store");
-            const storeObj = new Store();
-            return storeObj.save({
-              storeId: store.id,
-              name: store.name,
-              brand: store.brand,
-              type: store.type,
-              address: store.address,
-              status: store.status,
-            });
-          });
-
-          await Promise.all(storeObjects);
-          console.log("店铺数据同步完成");
-        } catch (error) {
-          console.error("同步店铺数据失败:", error);
-        }
-      }
-
-      // 检查管理员权限
-      async function checkAdmin() {
-        const currentUser = AV.User.current();
-        if (!currentUser) {
-          window.location.href = "index.html";
-          return;
-        }
-
-        const userData = JSON.parse(localStorage.getItem("user"));
-        if (userData.role !== "admin") {
-          alert("您没有访问此页面的权限");
-          window.location.href = "select-store.html";
-          return;
-        }
-
-        document.getElementById("adminName").textContent = userData.name;
-      }
 
       // 加载用户列表
       async function loadUsers() {
         try {
-          const query = new AV.Query("_User");
-          query.limit(1000); // 增加查询限制
-          query.ascending("username"); // 按用户名排序
-          const users = await query.find({ useMasterKey: true });
-          const usersList = document.getElementById("usersList");
+          console.log("开始加载用户列表...");
+          const currentUser = AV.User.current();
+          if (!currentUser) {
+            throw new Error("请先登录");
+          }
 
-          usersList.innerHTML = users
+          // 使用 REST API 查询用户
+          const appKey = "e4T5MriHgEYtmK7YPvV64awF";
+          const masterKey = "0DaW0GhKUl3Obr5QR5A0xpCw";
+          const masterKeyHeader = appKey + "," + masterKey + ",master";
+
+          const response = await fetch(
+            "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com/1.1/users",
+            {
+              headers: {
+                "X-LC-Id": "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+                "X-LC-Key": masterKeyHeader,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          console.log("查询到的用户数量:", data.results.length);
+          console.log("用户数据:", data.results);
+
+          const usersList = document.getElementById("usersList");
+          usersList.innerHTML = data.results
             .map((user) => {
-              const role = user.get("role") || "staff";
-              const name = user.get("name") || user.get("username");
+              const role = user.role || "staff";
+              const name = user.name || user.username;
               const createdAt = new Date(user.createdAt).toLocaleString();
-              const lastLoginAt = user.get("lastLoginAt")
-                ? new Date(user.get("lastLoginAt")).toLocaleString()
+              const lastLoginAt = user.lastLoginAt
+                ? new Date(user.lastLoginAt).toLocaleString()
                 : "从未登录";
 
               let roleText = "";
@@ -785,19 +724,15 @@
 
               return `
                 <tr>
-                  <td>${user.get("username")}</td>
+                  <td>${user.username}</td>
                   <td>${name}</td>
                   <td><span class="tag tag-${role}">${roleText}</span></td>
                   <td>${createdAt}</td>
                   <td>${lastLoginAt}</td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn btn-primary action-btn" onclick="editUser('${
-                        user.id
-                      }')">编辑</button>
-                      <button class="btn btn-danger action-btn" onclick="deleteUser('${
-                        user.id
-                      }')">删除</button>
+                      <button class="btn btn-primary action-btn" onclick="editUser('${user.objectId}')">编辑</button>
+                      <button class="btn btn-danger action-btn" onclick="deleteUser('${user.objectId}')">删除</button>
                     </div>
                   </td>
                 </tr>
@@ -810,40 +745,164 @@
         }
       }
 
+      // 检查管理员权限
+      async function checkAdmin() {
+        try {
+          const currentUser = AV.User.current();
+          if (!currentUser) {
+            window.location.href = "index.html";
+            return;
+          }
+
+          const role = currentUser.get("role");
+          if (role !== "admin") {
+            alert("您没有访问此页面的权限");
+            window.location.href = "select-store.html";
+            return;
+          }
+
+          document.getElementById("adminName").textContent =
+            currentUser.get("name") || currentUser.get("username");
+        } catch (error) {
+          console.error("验证管理员权限失败:", error);
+          window.location.href = "index.html";
+        }
+      }
+
+      // 保存用户
+      async function saveUser() {
+        try {
+          const userId = document.getElementById("userId").value;
+          const userData = {
+            username: document.getElementById("username").value,
+            password: document.getElementById("password").value,
+            name: document.getElementById("name").value,
+            role: document.getElementById("role").value,
+          };
+
+          let user;
+          if (userId) {
+            // 编辑现有用户
+            const query = new AV.Query("_User");
+            user = await query.get(userId);
+            user.set("name", userData.name);
+            user.set("role", userData.role);
+            if (userData.password) {
+              user.set("password", userData.password);
+            }
+            await user.save();
+          } else {
+            // 创建新用户
+            user = new AV.User();
+            user.setUsername(userData.username);
+            user.setPassword(userData.password);
+            user.set("name", userData.name);
+            user.set("role", userData.role);
+            await user.signUp();
+          }
+
+          // 关闭模态框并刷新列表
+          closeUserModal();
+          await loadUsers();
+          alert(userId ? "保存成功" : "创建成功");
+        } catch (error) {
+          console.error("保存用户失败:", error);
+          if (error.code === 202) {
+            alert("用户名已被占用，请使用其他用户名");
+          } else {
+            alert("保存失败: " + error.message);
+          }
+        }
+      }
+
       // 加载店铺列表
       async function loadStores() {
         try {
-          const query = new AV.Query("Store");
-          const stores = await query.find();
-          const storesList = document.getElementById("storesList");
+          console.log("开始加载店铺列表...");
+          const currentUser = AV.User.current();
+          if (!currentUser) {
+            throw new Error("请先登录");
+          }
 
-          storesList.innerHTML = stores
+          // 从 localStorage 获取店铺数据
+          const stores = JSON.parse(localStorage.getItem("stores"));
+          if (!stores) {
+            throw new Error("无法获取店铺信息");
+          }
+
+          // 创建 Store class 并同步数据
+          const Store = AV.Object.extend("Store");
+          const query = new AV.Query("Store");
+          const existingStores = await query.find();
+
+          // 删除现有的店铺数据
+          for (const store of existingStores) {
+            await store.destroy();
+          }
+
+          // 同步直营店数据
+          for (const store of stores.direct) {
+            const storeObj = new Store();
+            storeObj.set("storeId", store.id);
+            storeObj.set("brand", "食圈儿");
+            storeObj.set("name", store.name);
+            storeObj.set("type", "direct");
+            storeObj.set("address", store.address);
+            storeObj.set("status", store.status || "open");
+            await storeObj.save();
+          }
+
+          // 同步加盟店数据
+          for (const store of stores.franchise) {
+            const storeObj = new Store();
+            storeObj.set("storeId", store.id);
+            storeObj.set("brand", "食圈儿");
+            storeObj.set("name", store.name);
+            storeObj.set("type", "franchise");
+            storeObj.set("address", store.address);
+            storeObj.set("status", store.status || "open");
+            await storeObj.save();
+          }
+
+          // 重新查询并显示店铺列表
+          const updatedQuery = new AV.Query("Store");
+          const storesList = await updatedQuery.find();
+
+          console.log("查询到的店铺数量:", storesList.length);
+          console.log("店铺数据:", storesList);
+
+          const storesListElement = document.getElementById("storesList");
+          storesListElement.innerHTML = storesList
             .map((store) => {
               const storeType =
                 store.get("type") === "direct" ? "自营店" : "加盟店";
+              const storeName = store.get("name");
+              const displayStoreName = storeName.replace("食圈儿 ", "");
               return `
-              <tr>
-                <td>${store.get("brand")} ${store.get("name")}</td>
-                <td>${storeType}</td>
-                <td>${store.get("address")}</td>
-                <td>${store.get("status") === "open" ? "营业中" : "已打烊"}</td>
-                <td>
-                  <div class="action-buttons">
-                    <button class="btn btn-primary action-btn" onclick="editStore('${store.get(
-                      "storeId"
-                    )}')">编辑</button>
-                    <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get(
-                      "storeId"
-                    )}')">删除</button>
-                  </div>
-                </td>
-              </tr>
-            `;
+                <tr>
+                  <td>${displayStoreName}</td>
+                  <td>${storeType}</td>
+                  <td>${store.get("address")}</td>
+                  <td>${
+                    store.get("status") === "open" ? "营业中" : "已打烊"
+                  }</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn btn-primary action-btn" onclick="editStore('${store.get(
+                        "storeId"
+                      )}')">编辑</button>
+                      <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get(
+                        "storeId"
+                      )}')">删除</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
             })
             .join("");
         } catch (error) {
           console.error("加载店铺列表失败:", error);
-          alert("加载店铺列表失败，请重试");
+          alert("加载店铺列表失败: " + error.message);
         }
       }
 
@@ -965,9 +1024,12 @@
           .map((log) => {
             const time = new Date(log.createdAt).toLocaleString();
             const operator = log.get("operator");
-            const operatorName = operator ? operator.get("name") : "未知";
+            const operatorName = operator
+              ? operator.get("name") || operator.get("username")
+              : "未知";
             const type = log.get("type");
             const storeName = log.get("storeName") || "未知店铺";
+            const displayStoreName = storeName.replace("食圈儿 ", "");
 
             let typeText = "";
             switch (type) {
@@ -981,27 +1043,27 @@
                 typeText = "进货盘点";
                 break;
               default:
-                typeText = type;
+                typeText = type || "未知类型";
             }
 
             return `
-            <tr data-type="${type}">
-              <td>${time}</td>
-              <td>${typeText}</td>
-              <td>${operatorName}</td>
-              <td>${storeName}</td>
-              <td>
-                <div class="action-buttons">
-                  <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
-                </div>
-              </td>
-              <td>
-                <div class="action-buttons">
-                  <button class="btn btn-danger action-btn" onclick="deleteLog('${log.id}')">删除</button>
-                </div>
-              </td>
-            </tr>
-          `;
+              <tr data-type="${type}">
+                <td>${time}</td>
+                <td>${typeText}</td>
+                <td>${operatorName}</td>
+                <td>${displayStoreName}</td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
+                  </div>
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="btn btn-danger action-btn" onclick="deleteLog('${log.id}')">删除</button>
+                  </div>
+                </td>
+              </tr>
+            `;
           })
           .join("");
       }
@@ -1009,18 +1071,37 @@
       // 加载系统日志
       async function loadLogs() {
         try {
+          console.log("开始加载系统日志...");
+          const currentUser = AV.User.current();
+          if (!currentUser) {
+            throw new Error("请先登录");
+          }
+
           const query = new AV.Query("InventoryCheck");
           query.descending("createdAt");
           query.limit(100);
           query.include("operator");
-          currentLogs = await query.find({ useMasterKey: true });
+          console.log("执行日志查询...");
+          currentLogs = await query.find();
+
+          console.log("查询到的日志数量:", currentLogs.length);
+          console.log(
+            "日志数据:",
+            currentLogs.map((log) => ({
+              type: log.get("type"),
+              storeName: log.get("storeName"),
+              operator: log.get("operator")
+                ? log.get("operator").get("name")
+                : "未知",
+            }))
+          );
 
           // 更新统计数据
           updateStatistics(currentLogs);
 
           // 渲染日志列表
           const logsList = document.getElementById("logsList");
-          if (currentLogs.length === 0) {
+          if (!currentLogs || currentLogs.length === 0) {
             logsList.innerHTML = `
               <tr>
                 <td colspan="6" style="text-align: center;">暂无盘点记录</td>
@@ -1033,9 +1114,12 @@
             .map((log) => {
               const time = new Date(log.createdAt).toLocaleString();
               const operator = log.get("operator");
-              const operatorName = operator ? operator.get("name") : "未知";
+              const operatorName = operator
+                ? operator.get("name") || operator.get("username")
+                : "未知";
               const type = log.get("type");
               const storeName = log.get("storeName") || "未知店铺";
+              const displayStoreName = storeName.replace("食圈儿 ", "");
 
               let typeText = "";
               switch (type) {
@@ -1049,7 +1133,7 @@
                   typeText = "进货盘点";
                   break;
                 default:
-                  typeText = type;
+                  typeText = type || "未知类型";
               }
 
               return `
@@ -1057,7 +1141,7 @@
                   <td>${time}</td>
                   <td>${typeText}</td>
                   <td>${operatorName}</td>
-                  <td>${storeName}</td>
+                  <td>${displayStoreName}</td>
                   <td>
                     <div class="action-buttons">
                       <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
@@ -1315,7 +1399,6 @@
       // 页面加载时执行
       window.onload = async function () {
         await checkAdmin();
-        await syncStores();
         await loadUsers();
         await loadStores();
         await loadLogs();
@@ -1358,52 +1441,6 @@
         } catch (error) {
           console.error("获取用户信息失败:", error);
           alert("获取用户信息失败，请重试");
-        }
-      }
-
-      // 保存用户
-      async function saveUser() {
-        try {
-          const userId = document.getElementById("userId").value;
-          const userData = {
-            username: document.getElementById("username").value,
-            password: document.getElementById("password").value,
-            name: document.getElementById("name").value,
-            role: document.getElementById("role").value,
-          };
-
-          let user;
-          if (userId) {
-            // 编辑现有用户
-            const query = new AV.Query("_User");
-            user = await query.get(userId);
-            user.set("name", userData.name);
-            user.set("role", userData.role);
-            if (userData.password) {
-              user.set("password", userData.password);
-            }
-            await user.save(null, { useMasterKey: true });
-          } else {
-            // 创建新用户
-            user = new AV.User();
-            user.setUsername(userData.username);
-            user.setPassword(userData.password);
-            user.set("name", userData.name);
-            user.set("role", userData.role);
-            await user.signUp();
-          }
-
-          // 关闭模态框并刷新列表
-          closeUserModal();
-          await loadUsers();
-          alert(userId ? "保存成功" : "创建成功");
-        } catch (error) {
-          console.error("保存用户失败:", error);
-          if (error.code === 202) {
-            alert("用户名已被占用，请使用其他用户名");
-          } else {
-            alert("保存失败: " + error.message);
-          }
         }
       }
 

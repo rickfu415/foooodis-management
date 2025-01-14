@@ -125,9 +125,18 @@
         </div>
       </div>
 
-      <button id="startButton" class="btn btn-primary" onclick="startFix()">
-        开始修复
-      </button>
+      <div style="display: flex; gap: 10px; margin-bottom: 20px">
+        <button
+          id="createStoreClassBtn"
+          class="btn btn-primary"
+          onclick="createStoreClass()"
+        >
+          创建Store Class
+        </button>
+        <button id="startButton" class="btn btn-primary" onclick="startFix()">
+          开始修复
+        </button>
+      </div>
 
       <div class="log-container" id="logContainer">
         <!-- 日志将在这里显示 -->
@@ -248,6 +257,78 @@
         } finally {
           // 重新启用开始按钮
           document.getElementById("startButton").disabled = false;
+        }
+      }
+
+      // 创建 Store Class
+      async function createStoreClass() {
+        try {
+          document.getElementById("createStoreClassBtn").disabled = true;
+          addLog("开始创建 Store Class...");
+
+          // 获取所有店铺信息
+          const stores =
+            window.stores || JSON.parse(localStorage.getItem("stores"));
+          if (!stores) {
+            throw new Error("无法获取店铺信息");
+          }
+
+          // 创建 Store class
+          const Store = AV.Object.extend("Store");
+
+          // 先创建一个临时对象并保存，这样会自动创建 class
+          const tempStore = new Store();
+          tempStore.set("temp", true);
+          await tempStore.save();
+          await tempStore.destroy();
+          addLog("Store Class 创建成功");
+
+          // 查询现有数据
+          const query = new AV.Query("Store");
+          const existingStores = await query.find();
+
+          // 删除现有的店铺数据
+          if (existingStores.length > 0) {
+            addLog(`删除 ${existingStores.length} 条现有店铺数据...`);
+            for (const store of existingStores) {
+              await store.destroy();
+            }
+          }
+
+          // 同步直营店数据
+          addLog(`开始同步 ${stores.direct.length} 家直营店数据...`);
+          for (const store of stores.direct) {
+            const storeObj = new Store();
+            storeObj.set("storeId", store.id);
+            storeObj.set("brand", "食圈儿");
+            storeObj.set("name", store.name);
+            storeObj.set("type", "direct");
+            storeObj.set("address", store.address);
+            storeObj.set("status", store.status || "open");
+            await storeObj.save();
+            addLog(`已同步直营店: ${store.name}`, "success");
+          }
+
+          // 同步加盟店数据
+          addLog(`开始同步 ${stores.franchise.length} 家加盟店数据...`);
+          for (const store of stores.franchise) {
+            const storeObj = new Store();
+            storeObj.set("storeId", store.id);
+            storeObj.set("brand", "食圈儿");
+            storeObj.set("name", store.name);
+            storeObj.set("type", "franchise");
+            storeObj.set("address", store.address);
+            storeObj.set("status", store.status || "open");
+            await storeObj.save();
+            addLog(`已同步加盟店: ${store.name}`, "success");
+          }
+
+          addLog("Store Class 创建和数据同步完成！", "success");
+        } catch (error) {
+          console.error("创建 Store Class 失败:", error);
+          addLog(`创建失败: ${error.message}`, "error");
+        } finally {
+          document.getElementById("createStoreClassBtn").disabled = false;
         }
       }
 
