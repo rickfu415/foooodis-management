@@ -824,115 +824,117 @@
             throw new Error("请先登录");
           }
 
-          // 从 localStorage 获取店铺数据
-          const storesData = localStorage.getItem("stores");
-          console.log("从 localStorage 获取的原始数据:", storesData);
-
-          if (!storesData) {
-            console.error("localStorage 中没有找到店铺数据");
-            document.getElementById("storesList").innerHTML = `
-              <tr>
-                <td colspan="5" style="text-align: center;">暂无店铺数据，请刷新页面或重新登录</td>
-              </tr>
-            `;
-            return;
-          }
-
-          let stores;
-          try {
-            stores = JSON.parse(storesData);
-            console.log("解析后的店铺数据:", stores);
-          } catch (e) {
-            console.error("解析店铺数据失败:", e);
-            throw new Error("店铺数据格式错误");
-          }
-
-          if (!stores || (!stores.direct && !stores.franchise)) {
-            throw new Error("店铺数据结构无效");
-          }
-
-          // 创建 Store class 并同步数据
+          // 首先尝试从 LeanCloud 获取店铺数据
           const Store = AV.Object.extend("Store");
           const query = new AV.Query("Store");
-          const existingStores = await query.find();
-          console.log("已存在的店铺数量:", existingStores.length);
+          const storesList = await query.find();
+          console.log("从 LeanCloud 获取的店铺数量:", storesList.length);
 
-          // 删除现有的店铺数据
-          for (const store of existingStores) {
-            await store.destroy();
-          }
+          // 如果 LeanCloud 有数据，就使用这些数据
+          if (storesList && storesList.length > 0) {
+            // 将数据同步到 localStorage
+            const stores = {
+              direct: [],
+              franchise: []
+            };
 
-          // 同步直营店数据
-          const directStores = stores.direct || [];
-          console.log("同步直营店数量:", directStores.length);
-          for (const store of directStores) {
-            const storeObj = new Store();
-            storeObj.set("storeId", store.id);
-            storeObj.set("brand", "食圈儿");
-            storeObj.set("name", store.name);
-            storeObj.set("type", "direct");
-            storeObj.set("address", store.address);
-            storeObj.set("status", store.status || "open");
-            await storeObj.save();
-          }
+            storesList.forEach(store => {
+              const storeData = {
+                id: store.get("storeId"),
+                brand: store.get("brand"),
+                name: store.get("name"),
+                type: store.get("type"),
+                address: store.get("address"),
+                status: store.get("status") || "open"
+              };
 
-          // 同步加盟店数据
-          const franchiseStores = stores.franchise || [];
-          console.log("同步加盟店数量:", franchiseStores.length);
-          for (const store of franchiseStores) {
-            const storeObj = new Store();
-            storeObj.set("storeId", store.id);
-            storeObj.set("brand", "食圈儿");
-            storeObj.set("name", store.name);
-            storeObj.set("type", "franchise");
-            storeObj.set("address", store.address);
-            storeObj.set("status", store.status || "open");
-            await storeObj.save();
-          }
+              if (store.get("type") === "direct") {
+                stores.direct.push(storeData);
+              } else {
+                stores.franchise.push(storeData);
+              }
+            });
 
-          // 重新查询并显示店铺列表
-          const updatedQuery = new AV.Query("Store");
-          const storesList = await updatedQuery.find();
-          console.log("最终查询到的店铺数量:", storesList.length);
+            // 更新 localStorage
+            localStorage.setItem("stores", JSON.stringify(stores));
+            console.log("已将店铺数据同步到 localStorage");
 
-          const storesListElement = document.getElementById("storesList");
-          if (!storesList || storesList.length === 0) {
-            storesListElement.innerHTML = `
-              <tr>
-                <td colspan="5" style="text-align: center;">暂无店铺数据</td>
-              </tr>
-            `;
-            return;
-          }
+            // 渲染店铺列表
+            const storesListElement = document.getElementById("storesList");
+            storesListElement.innerHTML = storesList
+              .map((store) => {
+                const storeType = store.get("type") === "direct" ? "自营店" : "加盟店";
+                const storeName = store.get("name") || "";
+                const displayStoreName = storeName.replace("食圈儿 ", "");
+                return `
+                  <tr>
+                    <td>${displayStoreName}</td>
+                    <td>${storeType}</td>
+                    <td>${store.get("address") || ""}</td>
+                    <td>${store.get("status") === "open" ? "营业中" : "已打烊"}</td>
+                    <td>
+                      <div class="action-buttons">
+                        <button class="btn btn-primary action-btn" onclick="editStore('${store.get("storeId")}')">编辑</button>
+                        <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get("storeId")}')">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              })
+              .join("");
+          } else {
+            // 如果 LeanCloud 没有数据，尝试从 localStorage 获取
+            const storesData = localStorage.getItem("stores");
+            console.log("从 localStorage 获取的原始数据:", storesData);
 
-          storesListElement.innerHTML = storesList
-            .map((store) => {
-              const storeType =
-                store.get("type") === "direct" ? "自营店" : "加盟店";
-              const storeName = store.get("name") || "";
-              const displayStoreName = storeName.replace("食圈儿 ", "");
-              return `
+            if (!storesData) {
+              console.log("没有找到店铺数据");
+              document.getElementById("storesList").innerHTML = `
                 <tr>
-                  <td>${displayStoreName}</td>
-                  <td>${storeType}</td>
-                  <td>${store.get("address") || ""}</td>
-                  <td>${
-                    store.get("status") === "open" ? "营业中" : "已打烊"
-                  }</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn btn-primary action-btn" onclick="editStore('${store.get(
-                        "storeId"
-                      )}')">编辑</button>
-                      <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get(
-                        "storeId"
-                      )}')">删除</button>
-                    </div>
-                  </td>
+                  <td colspan="5" style="text-align: center;">暂无店铺数据</td>
                 </tr>
               `;
-            })
-            .join("");
+              return;
+            }
+
+            let stores;
+            try {
+              stores = JSON.parse(storesData);
+              console.log("解析后的店铺数据:", stores);
+
+              // 将 localStorage 数据同步到 LeanCloud
+              const directStores = stores.direct || [];
+              const franchiseStores = stores.franchise || [];
+
+              for (const store of directStores) {
+                const storeObj = new Store();
+                storeObj.set("storeId", store.id);
+                storeObj.set("brand", "食圈儿");
+                storeObj.set("name", store.name);
+                storeObj.set("type", "direct");
+                storeObj.set("address", store.address);
+                storeObj.set("status", store.status || "open");
+                await storeObj.save();
+              }
+
+              for (const store of franchiseStores) {
+                const storeObj = new Store();
+                storeObj.set("storeId", store.id);
+                storeObj.set("brand", "食圈儿");
+                storeObj.set("name", store.name);
+                storeObj.set("type", "franchise");
+                storeObj.set("address", store.address);
+                storeObj.set("status", store.status || "open");
+                await storeObj.save();
+              }
+
+              // 重新加载店铺列表
+              await loadStores();
+            } catch (e) {
+              console.error("处理店铺数据失败:", e);
+              throw new Error("店铺数据处理失败");
+            }
+          }
         } catch (error) {
           console.error("加载店铺列表失败:", error);
           document.getElementById("storesList").innerHTML = `
@@ -1513,6 +1515,13 @@
       }
 
       // 关闭用户模态框
+      function closeUserModal() {
+        document.getElementById("userModal").style.display = "none";
+      }
+    </script>
+  </body>
+</html>
+
       function closeUserModal() {
         document.getElementById("userModal").style.display = "none";
       }
