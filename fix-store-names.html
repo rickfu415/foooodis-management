@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>修复店铺名称 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .progress-container {
+        margin: 20px 0;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 20px;
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      .progress {
+        width: 0%;
+        height: 100%;
+        background-color: #007bff;
+        transition: width 0.3s ease;
+      }
+
+      .log-container {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .log-entry {
+        margin: 5px 0;
+        padding: 5px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .success {
+        color: #28a745;
+      }
+
+      .error {
+        color: #dc3545;
+      }
+
+      .warning {
+        color: #ffc107;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <a href="admin-panel.html" class="btn btn-back">返回管理面板</a>
+      </div>
+      <div class="user-info">
+        <span id="adminName">管理员</span>
+      </div>
+    </header>
+
+    <div class="container">
+      <h2>修复历史盘点记录的店铺名称</h2>
+
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div id="progressBar" class="progress"></div>
+        </div>
+        <div id="progressText" style="text-align: center; margin-top: 10px">
+          准备开始...
+        </div>
+      </div>
+
+      <button id="startButton" class="btn btn-primary" onclick="startFix()">
+        开始修复
+      </button>
+
+      <div class="log-container" id="logContainer">
+        <!-- 日志将在这里显示 -->
+      </div>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 检查管理员权限
+      async function checkAdmin() {
+        const currentUser = AV.User.current();
+        if (!currentUser) {
+          window.location.href = "index.html";
+          return;
+        }
+
+        const userData = JSON.parse(localStorage.getItem("user"));
+        if (userData.role !== "admin") {
+          alert("您没有访问此页面的权限");
+          window.location.href = "select-store.html";
+          return;
+        }
+
+        document.getElementById("adminName").textContent = userData.name;
+      }
+
+      // 添加日志
+      function addLog(message, type = "") {
+        const logContainer = document.getElementById("logContainer");
+        const logEntry = document.createElement("div");
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = message;
+        logContainer.insertBefore(logEntry, logContainer.firstChild);
+      }
+
+      // 更新进度
+      function updateProgress(current, total) {
+        const percentage = (current / total) * 100;
+        document.getElementById("progressBar").style.width = percentage + "%";
+        document.getElementById(
+          "progressText"
+        ).textContent = `处理进度: ${current}/${total} (${percentage.toFixed(
+          1
+        )}%)`;
+      }
+
+      // 开始修复
+      async function startFix() {
+        try {
+          // 禁用开始按钮
+          document.getElementById("startButton").disabled = true;
+          addLog("开始修复流程...");
+
+          // 获取所有店铺信息
+          const stores =
+            window.stores || JSON.parse(localStorage.getItem("stores"));
+          if (!stores) {
+            throw new Error("无法获取店铺信息");
+          }
+
+          // 创建店铺ID到名称的映射
+          const storeMap = {};
+          Object.entries(stores).forEach(([type, storeList]) => {
+            storeList.forEach((store) => {
+              storeMap[store.id] = `${store.brand} ${store.name}`;
+            });
+          });
+
+          // 查询所有没有店铺名称的盘点记录
+          const query = new AV.Query("InventoryCheck");
+          query.doesNotExist("storeName");
+          query.limit(1000); // 最大限制
+          const records = await query.find();
+
+          addLog(`找到 ${records.length} 条需要修复的记录`);
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          // 更新每条记录
+          for (let i = 0; i < records.length; i++) {
+            const record = records[i];
+            try {
+              const storeId = record.get("storeId");
+              if (storeId && storeMap[storeId]) {
+                record.set("storeName", storeMap[storeId]);
+                await record.save();
+                addLog(
+                  `成功更新记录 ${record.id}，店铺名称: ${storeMap[storeId]}`,
+                  "success"
+                );
+                successCount++;
+              } else {
+                addLog(`记录 ${record.id} 缺少有效的店铺ID`, "warning");
+                errorCount++;
+              }
+            } catch (error) {
+              addLog(`更新记录 ${record.id} 失败: ${error.message}`, "error");
+              errorCount++;
+            }
+
+            updateProgress(i + 1, records.length);
+          }
+
+          // 显示最终结果
+          addLog(
+            `修复完成！成功: ${successCount}, 失败: ${errorCount}`,
+            successCount > 0 ? "success" : "error"
+          );
+        } catch (error) {
+          addLog(`发生错误: ${error.message}`, "error");
+        } finally {
+          // 重新启用开始按钮
+          document.getElementById("startButton").disabled = false;
+        }
+      }
+
+      // 页面加载时执行
+      window.onload = async function () {
+        await checkAdmin();
+      };
+    </script>
+  </body>
+</html>

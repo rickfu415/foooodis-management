@@ -178,17 +178,35 @@
         transform: translateY(-2px);
       }
 
-      .stats-entry-title {
+      /* 管理员入口卡片样式 */
+      .admin-entry-card {
+        background: linear-gradient(135deg, #6f42c1, #4e2b89);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+
+      .admin-entry-card:hover {
+        transform: translateY(-2px);
+      }
+
+      .entry-title {
         font-size: 20px;
         font-weight: bold;
       }
 
-      .stats-entry-description {
+      .entry-description {
         font-size: 14px;
         opacity: 0.9;
       }
 
-      .stats-entry-icon {
+      .entry-icon {
         background: rgba(255, 255, 255, 0.2);
         width: 48px;
         height: 48px;
@@ -222,10 +240,10 @@
     <!-- 数据统计入口 -->
     <div class="stats-entry-card" onclick="navigateToStats()">
       <div>
-        <div class="stats-entry-title">数据统计</div>
-        <div class="stats-entry-description">查看所有店铺的销售和库存统计数据</div>
+        <div class="entry-title">数据统计</div>
+        <div class="entry-description">查看所有店铺的销售和库存统计数据</div>
       </div>
-      <div class="stats-entry-icon">📊</div>
+      <div class="entry-icon">📊</div>
     </div>
 
     <div class="store-section">
@@ -240,6 +258,19 @@
       <div class="store-list" id="franchiseStores">
         <!-- 加盟店铺列表将通过 JavaScript 动态生成 -->
       </div>
+    </div>
+
+    <!-- 管理员后台入口 -->
+    <div
+      class="admin-entry-card admin-only"
+      onclick="navigateToAdmin()"
+      style="display: none"
+    >
+      <div>
+        <div class="entry-title">后台管理</div>
+        <div class="entry-description">管理用户、店铺、查看系统日志等</div>
+      </div>
+      <div class="entry-icon">⚙️</div>
     </div>
 
     <div class="container">
@@ -290,9 +321,10 @@
         document.getElementById("userRole").textContent =
           user.role === "admin" ? "管理员" : "员工";
 
-        // 只保留管理员按钮显示逻辑
+        // 显示管理员专属内容
         if (user.role === "admin") {
           document.getElementById("productManageBtn").style.display = "block";
+          document.querySelector(".admin-entry-card").style.display = "flex";
         }
       }
 
@@ -329,13 +361,19 @@
       // 生成店铺列表项
       function createStoreElement(store, type) {
         return `
-                <div class="store-item" onclick="selectStore('${store.id}', '${type}')">
-                    <div class="store-type ${type === "direct" ? "type-direct" : "type-franchise"}">
+                <div class="store-item" onclick="selectStore('${
+                  store.id
+                }', '${type}')">
+                    <div class="store-type ${
+                      type === "direct" ? "type-direct" : "type-franchise"
+                    }">
                         ${type === "direct" ? "自营店" : "加盟店"}
                     </div>
                     <h3 class="store-name">${store.brand} ${store.name}</h3>
                     <p class="store-address">${store.address}</p>
-                    <span class="store-status ${store.status === "open" ? "status-open" : "status-closed"}">
+                    <span class="store-status ${
+                      store.status === "open" ? "status-open" : "status-closed"
+                    }">
                         ${store.status === "open" ? "营业中" : "已打烊"}
                     </span>
                 </div>
@@ -364,6 +402,11 @@
       // 添加数据统计页面导航函数
       function navigateToStats() {
         window.location.href = "all-statistics.html";
+      }
+
+      // 添加后台管理页面导航函数
+      function navigateToAdmin() {
+        window.location.href = "admin-panel.html";
       }
 
       // 页面加载时执行

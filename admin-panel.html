@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后台管理 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .card-title {
+        font-size: 18px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-success {
+        background-color: #28a745;
+        color: white;
+      }
+
+      .btn-danger {
+        background-color: #dc3545;
+        color: white;
+      }
+
+      /* 表格样式 */
+      .table-container {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      th,
+      td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+      }
+
+      th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        color: #495057;
+      }
+
+      tr:hover {
+        background-color: #f8f9fa;
+      }
+
+      /* 搜索和过滤区域 */
+      .filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .search-input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .filter-select {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      /* 操作按钮组 */
+      .action-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .action-btn {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+
+      /* 标签样式 */
+      .tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .tag-admin {
+        background-color: #e3f2fd;
+        color: #1976d2;
+      }
+
+      .tag-executive {
+        background-color: #fce4ec;
+        color: #c2185b;
+      }
+
+      .tag-manager {
+        background-color: #f3e5f5;
+        color: #7b1fa2;
+      }
+
+      .tag-staff {
+        background-color: #e8f5e9;
+        color: #388e3c;
+      }
+
+      .tag-supplier {
+        background-color: #fff3e0;
+        color: #f57c00;
+      }
+
+      /* 模态框样式 */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+      }
+
+      .modal-content {
+        position: relative;
+        background-color: white;
+        margin: 10% auto;
+        padding: 20px;
+        width: 80%;
+        max-width: 500px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .close {
+        font-size: 24px;
+        font-weight: bold;
+        cursor: pointer;
+        color: #666;
+      }
+
+      .close:hover {
+        color: #333;
+      }
+
+      .modal-body {
+        margin-bottom: 20px;
+      }
+
+      .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      /* 统计栏样式 */
+      .statistics-bar {
+        display: flex;
+        gap: 20px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .stat-label {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .stat-value {
+        font-weight: bold;
+        color: #333;
+        font-size: 16px;
+      }
+
+      /* 可排序表头样式 */
+      .sortable {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+      }
+
+      .sort-icon {
+        position: absolute;
+        right: 5px;
+        color: #999;
+      }
+
+      .sortable:hover {
+        background-color: #f0f0f0;
+      }
+
+      /* 过滤器样式优化 */
+      .filter-select {
+        min-width: 120px;
+      }
+
+      /* 日期选择器样式 */
+      .date-range {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .date-input {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .date-separator {
+        color: #666;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <a href="select-store.html" class="btn btn-back">返回店铺列表</a>
+      </div>
+      <div class="user-info">
+        <span id="adminName">管理员</span>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- 用户管理 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">用户管理</h2>
+          <button class="btn btn-primary" onclick="createUser()">
+            添加用户
+          </button>
+        </div>
+        <div class="filters">
+          <input
+            type="text"
+            class="search-input"
+            placeholder="搜索用户..."
+            onkeyup="filterUsers()"
+          />
+          <select class="filter-select" onchange="filterUsers()">
+            <option value="all">所有角色</option>
+            <option value="admin">管理员</option>
+            <option value="executive">高管</option>
+            <option value="manager">店长</option>
+            <option value="staff">店员</option>
+            <option value="supplier">供应商</option>
+          </select>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>用户名</th>
+                <th>姓名</th>
+                <th>角色</th>
+                <th>创建时间</th>
+                <th>最后登录</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="usersList">
+              <!-- 用户列表将通过 JavaScript 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 店铺管理 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">店铺管理</h2>
+          <button class="btn btn-primary" onclick="createStore()">
+            添加店铺
+          </button>
+        </div>
+        <div class="filters">
+          <input
+            type="text"
+            class="search-input"
+            placeholder="搜索店铺..."
+            onkeyup="filterStores()"
+          />
+          <select class="filter-select" onchange="filterStores()">
+            <option value="all">所有类型</option>
+            <option value="direct">自营店</option>
+            <option value="franchise">加盟店</option>
+          </select>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>店铺名称</th>
+                <th>类型</th>
+                <th>地址</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="storesList">
+              <!-- 店铺列表将通过 JavaScript 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 系统日志 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">系统日志</h2>
+          <div class="filters">
+            <div class="date-range">
+              <input
+                type="date"
+                id="startDate"
+                class="date-input"
+                onchange="filterLogs()"
+              />
+              <span class="date-separator">至</span>
+              <input
+                type="date"
+                id="endDate"
+                class="date-input"
+                onchange="filterLogs()"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="table-container">
+          <div class="statistics-bar">
+            <div class="stat-item">
+              <span class="stat-label">总记录数:</span>
+              <span id="totalCount" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">开店盘点:</span>
+              <span id="openingCount" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">闭店盘点:</span>
+              <span id="closingCount" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">进货盘点:</span>
+              <span id="restockingCount" class="stat-value">0</span>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th onclick="sortLogs('time')" class="sortable">
+                  时间 <span class="sort-icon">↓</span>
+                </th>
+                <th onclick="sortLogs('type')" class="sortable">
+                  操作类型 <span class="sort-icon"></span>
+                </th>
+                <th onclick="sortLogs('operator')" class="sortable">
+                  操作人 <span class="sort-icon"></span>
+                </th>
+                <th onclick="sortLogs('store')" class="sortable">
+                  店铺 <span class="sort-icon"></span>
+                </th>
+                <th>操作</th>
+                <th>删除</th>
+              </tr>
+            </thead>
+            <tbody id="logsList">
+              <!-- 日志列表将通过 JavaScript 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 编辑模态框 -->
+      <div id="editModal" class="modal" style="display: none">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>编辑盘点记录</h2>
+            <span class="close" onclick="closeModal()">&times;</span>
+          </div>
+          <div class="modal-body">
+            <form id="editForm">
+              <input type="hidden" id="editLogId" />
+              <div class="form-group">
+                <label>盘点类型</label>
+                <select id="editType" class="form-control">
+                  <option value="opening">开店盘点</option>
+                  <option value="closing">闭店盘点</option>
+                  <option value="restocking">进货盘点</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>店铺名称</label>
+                <input
+                  type="text"
+                  id="editStoreName"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label>操作时间</label>
+                <input
+                  type="datetime-local"
+                  id="editTime"
+                  class="form-control"
+                  required
+                />
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="saveLogEdit()">
+              保存
+            </button>
+            <button class="btn btn-secondary" onclick="closeModal()">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 店铺编辑模态框 -->
+      <div id="storeModal" class="modal" style="display: none">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="storeModalTitle">编辑店铺</h2>
+            <span class="close" onclick="closeStoreModal()">&times;</span>
+          </div>
+          <div class="modal-body">
+            <form id="storeForm">
+              <input type="hidden" id="storeId" />
+              <div class="form-group">
+                <label>品牌名称</label>
+                <input
+                  type="text"
+                  id="storeBrand"
+                  class="form-control"
+                  value="食圈儿"
+                  readonly
+                />
+              </div>
+              <div class="form-group">
+                <label>店铺名称</label>
+                <input
+                  type="text"
+                  id="storeName"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label>店铺类型</label>
+                <select id="storeType" class="form-control">
+                  <option value="direct">自营店</option>
+                  <option value="franchise">加盟店</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>店铺地址</label>
+                <input
+                  type="text"
+                  id="storeAddress"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label>营业状态</label>
+                <select id="storeStatus" class="form-control">
+                  <option value="open">营业中</option>
+                  <option value="closed">已打烊</option>
+                </select>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="saveStore()">保存</button>
+            <button class="btn btn-secondary" onclick="closeStoreModal()">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户编辑模态框 -->
+      <div id="userModal" class="modal" style="display: none">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="userModalTitle">编辑用户</h2>
+            <span class="close" onclick="closeUserModal()">&times;</span>
+          </div>
+          <div class="modal-body">
+            <form id="userForm">
+              <input type="hidden" id="userId" />
+              <div class="form-group">
+                <label>登录名</label>
+                <input
+                  type="text"
+                  id="username"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="password" class="form-control" />
+                <small style="color: #666">编辑时如不修改密码请留空</small>
+              </div>
+              <div class="form-group">
+                <label>姓名</label>
+                <input type="text" id="name" class="form-control" required />
+              </div>
+              <div class="form-group">
+                <label>角色</label>
+                <select id="role" class="form-control">
+                  <option value="admin">管理员</option>
+                  <option value="executive">高管</option>
+                  <option value="manager">店长</option>
+                  <option value="staff">店员</option>
+                  <option value="supplier">供应商</option>
+                </select>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="saveUser()">保存</button>
+            <button class="btn btn-secondary" onclick="closeUserModal()">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        masterKey: "0DaW0GhKUl3Obr5QR5A0xpCw",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 启用 masterKey，关闭 masterKey 签名验证
+      AV.Cloud.useMasterKey(true);
+
+      // 同步店铺数据到 LeanCloud
+      async function syncStores() {
+        try {
+          // 获取所有店铺数据
+          const stores = {
+            direct: [
+              {
+                id: "d1",
+                name: "神仙树",
+                brand: "食圈儿",
+                address: "成都市神仙树地铁站内",
+                status: "open",
+                type: "direct",
+              },
+              {
+                id: "d2",
+                name: "华府大道",
+                brand: "食圈儿",
+                address: "成都市华府大道地铁站",
+                status: "open",
+                type: "direct",
+              },
+            ],
+            franchise: [
+              {
+                id: "f1",
+                name: "昭觉寺南",
+                brand: "食圈儿",
+                address: "成都市昭觉寺南地铁站",
+                status: "open",
+                type: "franchise",
+              },
+            ],
+          };
+
+          // 查询现有店铺
+          const query = new AV.Query("Store");
+          const existingStores = await query.find();
+
+          // 删除所有现有店铺
+          await AV.Object.destroyAll(existingStores);
+
+          // 创建新的店铺记录
+          const allStores = [...stores.direct, ...stores.franchise];
+          const storeObjects = allStores.map((store) => {
+            const Store = AV.Object.extend("Store");
+            const storeObj = new Store();
+            return storeObj.save({
+              storeId: store.id,
+              name: store.name,
+              brand: store.brand,
+              type: store.type,
+              address: store.address,
+              status: store.status,
+            });
+          });
+
+          await Promise.all(storeObjects);
+          console.log("店铺数据同步完成");
+        } catch (error) {
+          console.error("同步店铺数据失败:", error);
+        }
+      }
+
+      // 检查管理员权限
+      async function checkAdmin() {
+        const currentUser = AV.User.current();
+        if (!currentUser) {
+          window.location.href = "index.html";
+          return;
+        }
+
+        const userData = JSON.parse(localStorage.getItem("user"));
+        if (userData.role !== "admin") {
+          alert("您没有访问此页面的权限");
+          window.location.href = "select-store.html";
+          return;
+        }
+
+        document.getElementById("adminName").textContent = userData.name;
+      }
+
+      // 加载用户列表
+      async function loadUsers() {
+        try {
+          const query = new AV.Query("_User");
+          query.limit(1000); // 增加查询限制
+          query.ascending("username"); // 按用户名排序
+          const users = await query.find({ useMasterKey: true });
+          const usersList = document.getElementById("usersList");
+
+          usersList.innerHTML = users
+            .map((user) => {
+              const role = user.get("role") || "staff";
+              const name = user.get("name") || user.get("username");
+              const createdAt = new Date(user.createdAt).toLocaleString();
+              const lastLoginAt = user.get("lastLoginAt")
+                ? new Date(user.get("lastLoginAt")).toLocaleString()
+                : "从未登录";
+
+              let roleText = "";
+              switch (role) {
+                case "admin":
+                  roleText = "管理员";
+                  break;
+                case "executive":
+                  roleText = "高管";
+                  break;
+                case "manager":
+                  roleText = "店长";
+                  break;
+                case "staff":
+                  roleText = "店员";
+                  break;
+                case "supplier":
+                  roleText = "供应商";
+                  break;
+                default:
+                  roleText = "未知角色";
+              }
+
+              return `
+                <tr>
+                  <td>${user.get("username")}</td>
+                  <td>${name}</td>
+                  <td><span class="tag tag-${role}">${roleText}</span></td>
+                  <td>${createdAt}</td>
+                  <td>${lastLoginAt}</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn btn-primary action-btn" onclick="editUser('${
+                        user.id
+                      }')">编辑</button>
+                      <button class="btn btn-danger action-btn" onclick="deleteUser('${
+                        user.id
+                      }')">删除</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载用户列表失败:", error);
+          alert("加载用户列表失败: " + error.message);
+        }
+      }
+
+      // 加载店铺列表
+      async function loadStores() {
+        try {
+          const query = new AV.Query("Store");
+          const stores = await query.find();
+          const storesList = document.getElementById("storesList");
+
+          storesList.innerHTML = stores
+            .map((store) => {
+              const storeType =
+                store.get("type") === "direct" ? "自营店" : "加盟店";
+              return `
+              <tr>
+                <td>${store.get("brand")} ${store.get("name")}</td>
+                <td>${storeType}</td>
+                <td>${store.get("address")}</td>
+                <td>${store.get("status") === "open" ? "营业中" : "已打烊"}</td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="btn btn-primary action-btn" onclick="editStore('${store.get(
+                      "storeId"
+                    )}')">编辑</button>
+                    <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get(
+                      "storeId"
+                    )}')">删除</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载店铺列表失败:", error);
+          alert("加载店铺列表失败，请重试");
+        }
+      }
+
+      let currentLogs = []; // 存储当前日志数据
+      let currentSort = { field: "time", ascending: false }; // 默认按时间降序
+
+      // 更新统计数据
+      function updateStatistics(logs) {
+        const stats = logs.reduce(
+          (acc, log) => {
+            const type = log.get("type");
+            acc.total++;
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+          },
+          { total: 0 }
+        );
+
+        document.getElementById("totalCount").textContent = stats.total;
+        document.getElementById("openingCount").textContent =
+          stats.opening || 0;
+        document.getElementById("closingCount").textContent =
+          stats.closing || 0;
+        document.getElementById("restockingCount").textContent =
+          stats.restocking || 0;
+      }
+
+      // 排序功能
+      function sortLogs(field) {
+        // 更新排序状态
+        if (currentSort.field === field) {
+          currentSort.ascending = !currentSort.ascending;
+        } else {
+          currentSort.field = field;
+          currentSort.ascending = true;
+        }
+
+        // 更新排序图标
+        document
+          .querySelectorAll(".sort-icon")
+          .forEach((icon) => (icon.textContent = ""));
+        const currentIcon = document.querySelector(
+          `th[onclick="sortLogs('${field}')"] .sort-icon`
+        );
+        currentIcon.textContent = currentSort.ascending ? "↑" : "↓";
+
+        // 排序数据
+        currentLogs.sort((a, b) => {
+          let valueA, valueB;
+
+          switch (field) {
+            case "time":
+              valueA = a.createdAt;
+              valueB = b.createdAt;
+              break;
+            case "type":
+              valueA = a.get("type");
+              valueB = b.get("type");
+              break;
+            case "operator":
+              valueA = a.get("operator")?.get("name") || "未知";
+              valueB = b.get("operator")?.get("name") || "未知";
+              break;
+            case "store":
+              valueA = a.get("storeName") || "未知店铺";
+              valueB = b.get("storeName") || "未知店铺";
+              break;
+          }
+
+          if (valueA < valueB) return currentSort.ascending ? -1 : 1;
+          if (valueA > valueB) return currentSort.ascending ? 1 : -1;
+          return 0;
+        });
+
+        // 重新渲染表格
+        renderLogs();
+      }
+
+      // 设置默认日期范围（最近30天）
+      function setDefaultDateRange() {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+
+        document.getElementById("endDate").value = endDate
+          .toISOString()
+          .split("T")[0];
+        document.getElementById("startDate").value = startDate
+          .toISOString()
+          .split("T")[0];
+      }
+
+      // 过滤日志
+      function filterLogs() {
+        const startDate = new Date(document.getElementById("startDate").value);
+        const endDate = new Date(document.getElementById("endDate").value);
+        endDate.setHours(23, 59, 59, 999); // 设置为当天结束时间
+
+        const filteredLogs = currentLogs.filter((log) => {
+          const logDate = new Date(log.createdAt);
+          return logDate >= startDate && logDate <= endDate;
+        });
+
+        // 更新统计数据
+        updateStatistics(filteredLogs);
+
+        // 渲染过滤后的日志
+        const logsList = document.getElementById("logsList");
+        if (filteredLogs.length === 0) {
+          logsList.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align: center;">暂无盘点记录</td>
+            </tr>
+          `;
+          return;
+        }
+
+        logsList.innerHTML = filteredLogs
+          .map((log) => {
+            const time = new Date(log.createdAt).toLocaleString();
+            const operator = log.get("operator");
+            const operatorName = operator ? operator.get("name") : "未知";
+            const type = log.get("type");
+            const storeName = log.get("storeName") || "未知店铺";
+
+            let typeText = "";
+            switch (type) {
+              case "opening":
+                typeText = "开店盘点";
+                break;
+              case "closing":
+                typeText = "闭店盘点";
+                break;
+              case "restocking":
+                typeText = "进货盘点";
+                break;
+              default:
+                typeText = type;
+            }
+
+            return `
+            <tr data-type="${type}">
+              <td>${time}</td>
+              <td>${typeText}</td>
+              <td>${operatorName}</td>
+              <td>${storeName}</td>
+              <td>
+                <div class="action-buttons">
+                  <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
+                </div>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <button class="btn btn-danger action-btn" onclick="deleteLog('${log.id}')">删除</button>
+                </div>
+              </td>
+            </tr>
+          `;
+          })
+          .join("");
+      }
+
+      // 加载系统日志
+      async function loadLogs() {
+        try {
+          const query = new AV.Query("InventoryCheck");
+          query.descending("createdAt");
+          query.limit(100);
+          query.include("operator");
+          currentLogs = await query.find({ useMasterKey: true });
+
+          // 更新统计数据
+          updateStatistics(currentLogs);
+
+          // 渲染日志列表
+          const logsList = document.getElementById("logsList");
+          if (currentLogs.length === 0) {
+            logsList.innerHTML = `
+              <tr>
+                <td colspan="6" style="text-align: center;">暂无盘点记录</td>
+              </tr>
+            `;
+            return;
+          }
+
+          logsList.innerHTML = currentLogs
+            .map((log) => {
+              const time = new Date(log.createdAt).toLocaleString();
+              const operator = log.get("operator");
+              const operatorName = operator ? operator.get("name") : "未知";
+              const type = log.get("type");
+              const storeName = log.get("storeName") || "未知店铺";
+
+              let typeText = "";
+              switch (type) {
+                case "opening":
+                  typeText = "开店盘点";
+                  break;
+                case "closing":
+                  typeText = "闭店盘点";
+                  break;
+                case "restocking":
+                  typeText = "进货盘点";
+                  break;
+                default:
+                  typeText = type;
+              }
+
+              return `
+                <tr data-type="${type}">
+                  <td>${time}</td>
+                  <td>${typeText}</td>
+                  <td>${operatorName}</td>
+                  <td>${storeName}</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn btn-danger action-btn" onclick="deleteLog('${log.id}')">删除</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载系统日志失败:", error);
+          alert("加载系统日志失败: " + error.message);
+        }
+      }
+
+      // 编辑日志记录
+      async function editLog(logId) {
+        window.location.href = `edit-inventory.html?id=${logId}`;
+      }
+
+      // 删除日志记录
+      async function deleteLog(logId) {
+        if (!confirm("确定要删除这条记录吗？删除后将无法恢复。")) {
+          return;
+        }
+
+        try {
+          const query = new AV.Query("InventoryCheck");
+          const log = await query.get(logId);
+          await log.destroy();
+
+          // 从当前日志列表中移除
+          currentLogs = currentLogs.filter((l) => l.id !== logId);
+
+          // 重新过滤和显示
+          filterLogs();
+          alert("删除成功");
+        } catch (error) {
+          console.error("删除失败:", error);
+          alert("删除失败，请重试");
+        }
+      }
+
+      // 保存编辑
+      async function saveLogEdit() {
+        try {
+          const logId = document.getElementById("editLogId").value;
+          const query = new AV.Query("InventoryCheck");
+          const log = await query.get(logId);
+
+          // 更新数据
+          log.set("type", document.getElementById("editType").value);
+          log.set("storeName", document.getElementById("editStoreName").value);
+          log.set("date", new Date(document.getElementById("editTime").value));
+
+          await log.save();
+
+          // 关闭模态框并刷新列表
+          closeModal();
+          await loadLogs();
+          alert("保存成功");
+        } catch (error) {
+          console.error("保存失败:", error);
+          alert("保存失败，请重试");
+        }
+      }
+
+      // 关闭模态框
+      function closeModal() {
+        document.getElementById("editModal").style.display = "none";
+      }
+
+      // 过滤用户列表
+      function filterUsers() {
+        const searchText = document
+          .querySelector(".search-input")
+          .value.toLowerCase();
+        const roleFilter = document.querySelector(".filter-select").value;
+        const rows = document.querySelectorAll("#usersList tr");
+
+        rows.forEach((row) => {
+          const username = row.cells[0].textContent.toLowerCase();
+          const name = row.cells[1].textContent.toLowerCase();
+          const roleText = row.cells[2].textContent;
+          const role = row.cells[2]
+            .querySelector(".tag")
+            .classList[1].replace("tag-", "");
+
+          const matchesSearch =
+            username.includes(searchText) || name.includes(searchText);
+          const matchesRole = roleFilter === "all" || role === roleFilter;
+
+          row.style.display = matchesSearch && matchesRole ? "" : "none";
+        });
+      }
+
+      // 过滤店铺列表
+      function filterStores() {
+        // TODO: 实现店铺列表过滤功能
+      }
+
+      // 编辑店铺
+      async function editStore(storeId) {
+        try {
+          const stores = JSON.parse(localStorage.getItem("stores"));
+          const store =
+            stores.direct.find((s) => s.id === storeId) ||
+            stores.franchise.find((s) => s.id === storeId);
+
+          if (!store) {
+            throw new Error("店铺不存在");
+          }
+
+          // 填充表单数据
+          document.getElementById("storeModalTitle").textContent = "编辑店铺";
+          document.getElementById("storeId").value = storeId;
+          document.getElementById("storeBrand").value = store.brand;
+          document.getElementById("storeName").value = store.name;
+          document.getElementById("storeType").value = store.type;
+          document.getElementById("storeAddress").value = store.address;
+          document.getElementById("storeStatus").value = store.status;
+
+          // 显示模态框
+          document.getElementById("storeModal").style.display = "block";
+        } catch (error) {
+          console.error("获取店铺信息失败:", error);
+          alert("获取店铺信息失败，请重试");
+        }
+      }
+
+      // 删除店铺
+      async function deleteStore(storeId) {
+        if (!confirm("确定要删除这个店铺吗？删除后将无法恢复。")) {
+          return;
+        }
+
+        try {
+          // 从 LeanCloud 删除
+          const query = new AV.Query("Store");
+          query.equalTo("storeId", storeId);
+          const storeObj = await query.first();
+          if (storeObj) {
+            await storeObj.destroy();
+          }
+
+          // 从 localStorage 删除
+          const stores = JSON.parse(localStorage.getItem("stores"));
+          stores.direct = stores.direct.filter((s) => s.id !== storeId);
+          stores.franchise = stores.franchise.filter((s) => s.id !== storeId);
+
+          // 更新 localStorage
+          localStorage.setItem("stores", JSON.stringify(stores));
+          window.stores = stores;
+
+          // 重新加载店铺列表
+          await loadStores();
+          alert("删除成功");
+        } catch (error) {
+          console.error("删除店铺失败:", error);
+          alert("删除店铺失败，请重试");
+        }
+      }
+
+      // 创建店铺
+      async function createStore() {
+        // 重置表单
+        document.getElementById("storeModalTitle").textContent = "创建店铺";
+        document.getElementById("storeId").value = "";
+        document.getElementById("storeBrand").value = "食圈儿";
+        document.getElementById("storeName").value = "";
+        document.getElementById("storeType").value = "direct";
+        document.getElementById("storeAddress").value = "";
+        document.getElementById("storeStatus").value = "open";
+
+        // 显示模态框
+        document.getElementById("storeModal").style.display = "block";
+      }
+
+      // 保存店铺
+      async function saveStore() {
+        try {
+          const stores = JSON.parse(localStorage.getItem("stores"));
+          const storeId = document.getElementById("storeId").value;
+          const storeData = {
+            brand: document.getElementById("storeBrand").value,
+            name: document.getElementById("storeName").value,
+            type: document.getElementById("storeType").value,
+            address: document.getElementById("storeAddress").value,
+            status: document.getElementById("storeStatus").value,
+          };
+
+          // 同步到 LeanCloud
+          const Store = AV.Object.extend("Store");
+          let storeObj;
+
+          if (storeId) {
+            // 编辑现有店铺
+            const query = new AV.Query("Store");
+            query.equalTo("storeId", storeId);
+            const existingStore = await query.first();
+            if (existingStore) {
+              storeObj = existingStore;
+            } else {
+              storeObj = new Store();
+              storeObj.set("storeId", storeId);
+            }
+
+            const storeList =
+              storeData.type === "direct" ? stores.direct : stores.franchise;
+            const index = storeList.findIndex((s) => s.id === storeId);
+            if (index !== -1) {
+              storeList[index] = { ...storeData, id: storeId };
+            }
+          } else {
+            // 创建新店铺
+            const newId = `store${Date.now()}`;
+            storeObj = new Store();
+            storeObj.set("storeId", newId);
+
+            const storeList =
+              storeData.type === "direct" ? stores.direct : stores.franchise;
+            storeList.push({ ...storeData, id: newId });
+          }
+
+          // 更新 LeanCloud 数据
+          Object.entries(storeData).forEach(([key, value]) => {
+            storeObj.set(key, value);
+          });
+          await storeObj.save();
+
+          // 更新 localStorage
+          localStorage.setItem("stores", JSON.stringify(stores));
+          window.stores = stores;
+
+          // 关闭模态框并刷新列表
+          closeStoreModal();
+          await loadStores();
+          alert(storeId ? "保存成功" : "创建成功");
+        } catch (error) {
+          console.error("保存店铺失败:", error);
+          alert("保存失败，请重试");
+        }
+      }
+
+      // 关闭店铺模态框
+      function closeStoreModal() {
+        document.getElementById("storeModal").style.display = "none";
+      }
+
+      // 页面加载时执行
+      window.onload = async function () {
+        await checkAdmin();
+        await syncStores();
+        await loadUsers();
+        await loadStores();
+        await loadLogs();
+        setDefaultDateRange();
+        filterLogs();
+      };
+
+      // 创建用户
+      async function createUser() {
+        // 重置表单
+        document.getElementById("userModalTitle").textContent = "创建用户";
+        document.getElementById("userId").value = "";
+        document.getElementById("username").value = "";
+        document.getElementById("username").disabled = false;
+        document.getElementById("password").value = "";
+        document.getElementById("name").value = "";
+        document.getElementById("role").value = "staff"; // 默认为店员
+
+        // 显示模态框
+        document.getElementById("userModal").style.display = "block";
+      }
+
+      // 编辑用户
+      async function editUser(userId) {
+        try {
+          const query = new AV.Query("_User");
+          const user = await query.get(userId);
+
+          // 填充表单数据
+          document.getElementById("userModalTitle").textContent = "编辑用户";
+          document.getElementById("userId").value = userId;
+          document.getElementById("username").value = user.get("username");
+          document.getElementById("username").disabled = true; // 禁止修改登录名
+          document.getElementById("password").value = ""; // 密码留空
+          document.getElementById("name").value = user.get("name");
+          document.getElementById("role").value = user.get("role") || "staff";
+
+          // 显示模态框
+          document.getElementById("userModal").style.display = "block";
+        } catch (error) {
+          console.error("获取用户信息失败:", error);
+          alert("获取用户信息失败，请重试");
+        }
+      }
+
+      // 保存用户
+      async function saveUser() {
+        try {
+          const userId = document.getElementById("userId").value;
+          const userData = {
+            username: document.getElementById("username").value,
+            password: document.getElementById("password").value,
+            name: document.getElementById("name").value,
+            role: document.getElementById("role").value,
+          };
+
+          let user;
+          if (userId) {
+            // 编辑现有用户
+            const query = new AV.Query("_User");
+            user = await query.get(userId);
+            user.set("name", userData.name);
+            user.set("role", userData.role);
+            if (userData.password) {
+              user.set("password", userData.password);
+            }
+            await user.save(null, { useMasterKey: true });
+          } else {
+            // 创建新用户
+            user = new AV.User();
+            user.setUsername(userData.username);
+            user.setPassword(userData.password);
+            user.set("name", userData.name);
+            user.set("role", userData.role);
+            await user.signUp();
+          }
+
+          // 关闭模态框并刷新列表
+          closeUserModal();
+          await loadUsers();
+          alert(userId ? "保存成功" : "创建成功");
+        } catch (error) {
+          console.error("保存用户失败:", error);
+          if (error.code === 202) {
+            alert("用户名已被占用，请使用其他用户名");
+          } else {
+            alert("保存失败: " + error.message);
+          }
+        }
+      }
+
+      // 删除用户
+      async function deleteUser(userId) {
+        if (!confirm("确定要删除这个用户吗？删除后将无法恢复。")) {
+          return;
+        }
+
+        try {
+          const query = new AV.Query("_User");
+          const user = await query.get(userId);
+          await user.destroy();
+
+          await loadUsers();
+          alert("删除成功");
+        } catch (error) {
+          console.error("删除用户失败:", error);
+          alert("删除用户失败，请重试");
+        }
+      }
+
+      // 关闭用户模态框
+      function closeUserModal() {
+        document.getElementById("userModal").style.display = "none";
+      }
+    </script>
+  </body>
+</html>

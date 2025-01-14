@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>编辑盘点记录 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-danger {
+        background-color: #dc3545;
+        color: white;
+      }
+
+      .container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      .form-header {
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .form-title {
+        font-size: 20px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .table-container {
+        margin-top: 20px;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+      }
+
+      th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        color: #495057;
+      }
+
+      .quantity-input {
+        width: 80px;
+        padding: 4px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-align: center;
+      }
+
+      .note-input {
+        width: 200px;
+      }
+
+      .form-actions {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <a href="admin-panel.html" class="btn btn-back">返回管理面板</a>
+      </div>
+      <div class="user-info">
+        <span id="adminName">管理员</span>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="form-header">
+        <h2 class="form-title">编辑盘点记录</h2>
+      </div>
+
+      <form id="editForm">
+        <div class="form-group">
+          <label>盘点类型</label>
+          <select id="editType" class="form-control">
+            <option value="opening">开店盘点</option>
+            <option value="closing">闭店盘点</option>
+            <option value="restocking">进货盘点</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>店铺名称</label>
+          <input type="text" id="editStoreName" class="form-control" required />
+        </div>
+
+        <div class="form-group">
+          <label>操作时间</label>
+          <input
+            type="datetime-local"
+            id="editTime"
+            class="form-control"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label>操作员</label>
+          <input type="text" id="editOperator" class="form-control" readonly />
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>商品名称</th>
+                <th>类别</th>
+                <th>数量</th>
+                <th>备注</th>
+              </tr>
+            </thead>
+            <tbody id="productList">
+              <!-- 商品列表将通过 JavaScript 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="form-actions">
+          <button
+            type="button"
+            class="btn btn-danger"
+            onclick="confirmDelete()"
+          >
+            删除记录
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            id="saveButton"
+            disabled
+          >
+            保存修改
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      let currentLog = null;
+      let hasChanges = false;
+
+      // 检查管理员权限
+      async function checkAdmin() {
+        const currentUser = AV.User.current();
+        if (!currentUser) {
+          window.location.href = "index.html";
+          return;
+        }
+
+        const userData = JSON.parse(localStorage.getItem("user"));
+        if (userData.role !== "admin") {
+          alert("您没有访问此页面的权限");
+          window.location.href = "select-store.html";
+          return;
+        }
+
+        document.getElementById("adminName").textContent = userData.name;
+      }
+
+      // 检查是否有修改
+      function checkChanges() {
+        const saveButton = document.getElementById("saveButton");
+        saveButton.disabled = !hasChanges;
+      }
+
+      // 标记有修改
+      function markAsChanged() {
+        hasChanges = true;
+        checkChanges();
+      }
+
+      // 加载盘点记录
+      async function loadInventoryCheck() {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const logId = urlParams.get("id");
+
+          if (!logId) {
+            alert("未指定记录ID");
+            window.location.href = "admin-panel.html";
+            return;
+          }
+
+          const query = new AV.Query("InventoryCheck");
+          query.include("operator");
+          currentLog = await query.get(logId);
+
+          // 填充基本信息
+          document.getElementById("editType").value = currentLog.get("type");
+          document.getElementById("editStoreName").value =
+            currentLog.get("storeName") || "";
+
+          // 显示操作员
+          const operator = currentLog.get("operator");
+          document.getElementById("editOperator").value = operator
+            ? operator.get("name")
+            : "未知";
+
+          const date = currentLog.get("date") || currentLog.createdAt;
+          const formattedDate = new Date(date).toISOString().slice(0, 16);
+          document.getElementById("editTime").value = formattedDate;
+
+          // 填充商品列表
+          const items = currentLog.get("items") || [];
+          const productList = document.getElementById("productList");
+
+          productList.innerHTML = items
+            .map(
+              (item, index) => `
+            <tr>
+              <td>${item.productName || "未知商品"}</td>
+              <td>${item.product.category === "drinks" ? "饮品" : "烘焙"}</td>
+              <td>
+                <input type="number" 
+                  class="quantity-input" 
+                  value="${item.quantity}"
+                  min="0"
+                  data-index="${index}"
+                  onchange="updateQuantity(${index}, this.value)"
+                >
+              </td>
+              <td>
+                <input type="text" 
+                  class="form-control note-input" 
+                  value="${item.note || ""}"
+                  data-index="${index}"
+                  onchange="updateNote(${index}, this.value)"
+                >
+              </td>
+            </tr>
+          `
+            )
+            .join("");
+        } catch (error) {
+          console.error("加载记录失败:", error);
+          alert("加载记录失败，请重试");
+        }
+      }
+
+      // 更新商品数量
+      function updateQuantity(index, value) {
+        const items = currentLog.get("items") || [];
+        items[index].quantity = parseInt(value) || 0;
+        currentLog.set("items", items);
+        markAsChanged();
+      }
+
+      // 更新商品备注
+      function updateNote(index, value) {
+        const items = currentLog.get("items") || [];
+        items[index].note = value;
+        currentLog.set("items", items);
+        markAsChanged();
+      }
+
+      // 保存修改
+      document
+        .getElementById("editForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          try {
+            // 更新基本信息
+            currentLog.set("type", document.getElementById("editType").value);
+            currentLog.set(
+              "storeName",
+              document.getElementById("editStoreName").value
+            );
+            currentLog.set(
+              "date",
+              new Date(document.getElementById("editTime").value)
+            );
+
+            await currentLog.save();
+            hasChanges = false;
+            checkChanges();
+            alert("保存成功");
+            window.location.href = "admin-panel.html";
+          } catch (error) {
+            console.error("保存失败:", error);
+            alert("保存失败，请重试");
+          }
+        });
+
+      // 确认删除
+      async function confirmDelete() {
+        if (confirm("确定要删除这条记录吗？删除后将无法恢复。")) {
+          try {
+            await currentLog.destroy();
+            alert("删除成功");
+            window.location.href = "admin-panel.html";
+          } catch (error) {
+            console.error("删除失败:", error);
+            alert("删除失败，请重试");
+          }
+        }
+      }
+
+      // 添加change事件监听
+      document
+        .getElementById("editType")
+        .addEventListener("change", markAsChanged);
+      document
+        .getElementById("editStoreName")
+        .addEventListener("change", markAsChanged);
+      document
+        .getElementById("editTime")
+        .addEventListener("change", markAsChanged);
+
+      // 页面加载时执行
+      window.onload = async function () {
+        await checkAdmin();
+        await loadInventoryCheck();
+      };
+    </script>
+  </body>
+</html>
