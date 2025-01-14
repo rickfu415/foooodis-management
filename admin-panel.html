@@ -825,15 +825,37 @@
           }
 
           // 从 localStorage 获取店铺数据
-          const stores = JSON.parse(localStorage.getItem("stores"));
-          if (!stores) {
-            throw new Error("无法获取店铺信息");
+          const storesData = localStorage.getItem("stores");
+          console.log("从 localStorage 获取的原始数据:", storesData);
+
+          if (!storesData) {
+            console.error("localStorage 中没有找到店铺数据");
+            document.getElementById("storesList").innerHTML = `
+              <tr>
+                <td colspan="5" style="text-align: center;">暂无店铺数据，请刷新页面或重新登录</td>
+              </tr>
+            `;
+            return;
+          }
+
+          let stores;
+          try {
+            stores = JSON.parse(storesData);
+            console.log("解析后的店铺数据:", stores);
+          } catch (e) {
+            console.error("解析店铺数据失败:", e);
+            throw new Error("店铺数据格式错误");
+          }
+
+          if (!stores || (!stores.direct && !stores.franchise)) {
+            throw new Error("店铺数据结构无效");
           }
 
           // 创建 Store class 并同步数据
           const Store = AV.Object.extend("Store");
           const query = new AV.Query("Store");
           const existingStores = await query.find();
+          console.log("已存在的店铺数量:", existingStores.length);
 
           // 删除现有的店铺数据
           for (const store of existingStores) {
@@ -841,7 +863,9 @@
           }
 
           // 同步直营店数据
-          for (const store of stores.direct) {
+          const directStores = stores.direct || [];
+          console.log("同步直营店数量:", directStores.length);
+          for (const store of directStores) {
             const storeObj = new Store();
             storeObj.set("storeId", store.id);
             storeObj.set("brand", "食圈儿");
@@ -853,7 +877,9 @@
           }
 
           // 同步加盟店数据
-          for (const store of stores.franchise) {
+          const franchiseStores = stores.franchise || [];
+          console.log("同步加盟店数量:", franchiseStores.length);
+          for (const store of franchiseStores) {
             const storeObj = new Store();
             storeObj.set("storeId", store.id);
             storeObj.set("brand", "食圈儿");
@@ -867,22 +893,29 @@
           // 重新查询并显示店铺列表
           const updatedQuery = new AV.Query("Store");
           const storesList = await updatedQuery.find();
-
-          console.log("查询到的店铺数量:", storesList.length);
-          console.log("店铺数据:", storesList);
+          console.log("最终查询到的店铺数量:", storesList.length);
 
           const storesListElement = document.getElementById("storesList");
+          if (!storesList || storesList.length === 0) {
+            storesListElement.innerHTML = `
+              <tr>
+                <td colspan="5" style="text-align: center;">暂无店铺数据</td>
+              </tr>
+            `;
+            return;
+          }
+
           storesListElement.innerHTML = storesList
             .map((store) => {
               const storeType =
                 store.get("type") === "direct" ? "自营店" : "加盟店";
-              const storeName = store.get("name");
+              const storeName = store.get("name") || "";
               const displayStoreName = storeName.replace("食圈儿 ", "");
               return `
                 <tr>
                   <td>${displayStoreName}</td>
                   <td>${storeType}</td>
-                  <td>${store.get("address")}</td>
+                  <td>${store.get("address") || ""}</td>
                   <td>${
                     store.get("status") === "open" ? "营业中" : "已打烊"
                   }</td>
@@ -902,6 +935,11 @@
             .join("");
         } catch (error) {
           console.error("加载店铺列表失败:", error);
+          document.getElementById("storesList").innerHTML = `
+            <tr>
+              <td colspan="5" style="text-align: center;">加载店铺列表失败: ${error.message}</td>
+            </tr>
+          `;
           alert("加载店铺列表失败: " + error.message);
         }
       }
@@ -1398,12 +1436,23 @@
 
       // 页面加载时执行
       window.onload = async function () {
-        await checkAdmin();
-        await loadUsers();
-        await loadStores();
-        await loadLogs();
-        setDefaultDateRange();
-        filterLogs();
+        try {
+          await checkAdmin();
+          console.log("管理员验证通过");
+
+          // 并行加载数据以提高性能
+          await Promise.all([
+            loadUsers().catch((e) => console.error("加载用户列表失败:", e)),
+            loadStores().catch((e) => console.error("加载店铺列表失败:", e)),
+            loadLogs().catch((e) => console.error("加载日志失败:", e)),
+          ]);
+
+          setDefaultDateRange();
+          filterLogs();
+        } catch (error) {
+          console.error("页面加载失败:", error);
+          alert("页面加载失败，请刷新重试");
+        }
       };
 
       // 创建用户
