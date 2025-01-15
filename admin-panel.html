@@ -648,6 +648,27 @@
           </div>
         </div>
       </div>
+
+      <!-- 销售统计入口 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">销售统计</h2>
+          <a href="sales-statistics.html" class="btn btn-primary">
+            进入销售统计
+          </a>
+        </div>
+        <div class="filters">
+          <p style="color: #666">管理每日商品销量和销售额统计</p>
+        </div>
+        <div class="table-container">
+          <div class="statistics-bar">
+            <div class="stat-item">
+              <span class="stat-label">今日已录入店铺:</span>
+              <span id="todaySalesCount" class="stat-value">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -835,17 +856,17 @@
             // 将数据同步到 localStorage
             const stores = {
               direct: [],
-              franchise: []
+              franchise: [],
             };
 
-            storesList.forEach(store => {
+            storesList.forEach((store) => {
               const storeData = {
                 id: store.get("storeId"),
                 brand: store.get("brand"),
                 name: store.get("name"),
                 type: store.get("type"),
                 address: store.get("address"),
-                status: store.get("status") || "open"
+                status: store.get("status") || "open",
               };
 
               if (store.get("type") === "direct") {
@@ -863,7 +884,8 @@
             const storesListElement = document.getElementById("storesList");
             storesListElement.innerHTML = storesList
               .map((store) => {
-                const storeType = store.get("type") === "direct" ? "自营店" : "加盟店";
+                const storeType =
+                  store.get("type") === "direct" ? "自营店" : "加盟店";
                 const storeName = store.get("name") || "";
                 const displayStoreName = storeName.replace("食圈儿 ", "");
                 return `
@@ -871,11 +893,17 @@
                     <td>${displayStoreName}</td>
                     <td>${storeType}</td>
                     <td>${store.get("address") || ""}</td>
-                    <td>${store.get("status") === "open" ? "营业中" : "已打烊"}</td>
+                    <td>${
+                      store.get("status") === "open" ? "营业中" : "已打烊"
+                    }</td>
                     <td>
                       <div class="action-buttons">
-                        <button class="btn btn-primary action-btn" onclick="editStore('${store.get("storeId")}')">编辑</button>
-                        <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get("storeId")}')">删除</button>
+                        <button class="btn btn-primary action-btn" onclick="editStore('${store.get(
+                          "storeId"
+                        )}')">编辑</button>
+                        <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get(
+                          "storeId"
+                        )}')">删除</button>
                       </div>
                     </td>
                   </tr>
@@ -946,169 +974,30 @@
         }
       }
 
-      let currentLogs = []; // 存储当前日志数据
-      let currentSort = { field: "time", ascending: false }; // 默认按时间降序
+      // 添加一个变量来存储原始日志数据
+      let originalLogs = []; // 存储原始日志数据
+      let currentLogs = []; // 存储过滤后的日志数据
 
-      // 更新统计数据
-      function updateStatistics(logs) {
-        const stats = logs.reduce(
-          (acc, log) => {
-            const type = log.get("type");
-            acc.total++;
-            acc[type] = (acc[type] || 0) + 1;
-            return acc;
-          },
-          { total: 0 }
-        );
-
-        document.getElementById("totalCount").textContent = stats.total;
-        document.getElementById("openingCount").textContent =
-          stats.opening || 0;
-        document.getElementById("closingCount").textContent =
-          stats.closing || 0;
-        document.getElementById("restockingCount").textContent =
-          stats.restocking || 0;
-      }
-
-      // 排序功能
-      function sortLogs(field) {
-        // 更新排序状态
-        if (currentSort.field === field) {
-          currentSort.ascending = !currentSort.ascending;
-        } else {
-          currentSort.field = field;
-          currentSort.ascending = true;
-        }
-
-        // 更新排序图标
-        document
-          .querySelectorAll(".sort-icon")
-          .forEach((icon) => (icon.textContent = ""));
-        const currentIcon = document.querySelector(
-          `th[onclick="sortLogs('${field}')"] .sort-icon`
-        );
-        currentIcon.textContent = currentSort.ascending ? "↑" : "↓";
-
-        // 排序数据
-        currentLogs.sort((a, b) => {
-          let valueA, valueB;
-
-          switch (field) {
-            case "time":
-              valueA = a.createdAt;
-              valueB = b.createdAt;
-              break;
-            case "type":
-              valueA = a.get("type");
-              valueB = b.get("type");
-              break;
-            case "operator":
-              valueA = a.get("operator")?.get("name") || "未知";
-              valueB = b.get("operator")?.get("name") || "未知";
-              break;
-            case "store":
-              valueA = a.get("storeName") || "未知店铺";
-              valueB = b.get("storeName") || "未知店铺";
-              break;
-          }
-
-          if (valueA < valueB) return currentSort.ascending ? -1 : 1;
-          if (valueA > valueB) return currentSort.ascending ? 1 : -1;
-          return 0;
-        });
-
-        // 重新渲染表格
-        renderLogs();
-      }
-
-      // 设置默认日期范围（最近30天）
-      function setDefaultDateRange() {
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 30);
-
-        document.getElementById("endDate").value = endDate
-          .toISOString()
-          .split("T")[0];
-        document.getElementById("startDate").value = startDate
-          .toISOString()
-          .split("T")[0];
-      }
-
-      // 过滤日志
+      // 修改 filterLogs 函数
       function filterLogs() {
         const startDate = new Date(document.getElementById("startDate").value);
         const endDate = new Date(document.getElementById("endDate").value);
         endDate.setHours(23, 59, 59, 999); // 设置为当天结束时间
 
-        const filteredLogs = currentLogs.filter((log) => {
+        // 基于原始数据进行过滤
+        currentLogs = originalLogs.filter((log) => {
           const logDate = new Date(log.createdAt);
           return logDate >= startDate && logDate <= endDate;
         });
 
         // 更新统计数据
-        updateStatistics(filteredLogs);
+        updateStatistics(currentLogs);
 
-        // 渲染过滤后的日志
-        const logsList = document.getElementById("logsList");
-        if (filteredLogs.length === 0) {
-          logsList.innerHTML = `
-            <tr>
-              <td colspan="6" style="text-align: center;">暂无盘点记录</td>
-            </tr>
-          `;
-          return;
-        }
-
-        logsList.innerHTML = filteredLogs
-          .map((log) => {
-            const time = new Date(log.createdAt).toLocaleString();
-            const operator = log.get("operator");
-            const operatorName = operator
-              ? operator.get("name") || operator.get("username")
-              : "未知";
-            const type = log.get("type");
-            const storeName = log.get("storeName") || "未知店铺";
-            const displayStoreName = storeName.replace("食圈儿 ", "");
-
-            let typeText = "";
-            switch (type) {
-              case "opening":
-                typeText = "开店盘点";
-                break;
-              case "closing":
-                typeText = "闭店盘点";
-                break;
-              case "restocking":
-                typeText = "进货盘点";
-                break;
-              default:
-                typeText = type || "未知类型";
-            }
-
-            return `
-              <tr data-type="${type}">
-                <td>${time}</td>
-                <td>${typeText}</td>
-                <td>${operatorName}</td>
-                <td>${displayStoreName}</td>
-                <td>
-                  <div class="action-buttons">
-                    <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
-                  </div>
-                </td>
-                <td>
-                  <div class="action-buttons">
-                    <button class="btn btn-danger action-btn" onclick="deleteLog('${log.id}')">删除</button>
-                  </div>
-                </td>
-              </tr>
-            `;
-          })
-          .join("");
+        // 渲染日志列表
+        renderLogs();
       }
 
-      // 加载系统日志
+      // 修改 loadLogs 函数
       async function loadLogs() {
         try {
           console.log("开始加载系统日志...");
@@ -1122,80 +1011,19 @@
           query.limit(100);
           query.include("operator");
           console.log("执行日志查询...");
-          currentLogs = await query.find();
 
-          console.log("查询到的日志数量:", currentLogs.length);
-          console.log(
-            "日志数据:",
-            currentLogs.map((log) => ({
-              type: log.get("type"),
-              storeName: log.get("storeName"),
-              operator: log.get("operator")
-                ? log.get("operator").get("name")
-                : "未知",
-            }))
-          );
+          // 保存原始数据
+          originalLogs = await query.find();
+          console.log("查询到的日志数量:", originalLogs.length);
+
+          // 初始化当前日志为原始数据
+          currentLogs = [...originalLogs];
 
           // 更新统计数据
           updateStatistics(currentLogs);
 
           // 渲染日志列表
-          const logsList = document.getElementById("logsList");
-          if (!currentLogs || currentLogs.length === 0) {
-            logsList.innerHTML = `
-              <tr>
-                <td colspan="6" style="text-align: center;">暂无盘点记录</td>
-              </tr>
-            `;
-            return;
-          }
-
-          logsList.innerHTML = currentLogs
-            .map((log) => {
-              const time = new Date(log.createdAt).toLocaleString();
-              const operator = log.get("operator");
-              const operatorName = operator
-                ? operator.get("name") || operator.get("username")
-                : "未知";
-              const type = log.get("type");
-              const storeName = log.get("storeName") || "未知店铺";
-              const displayStoreName = storeName.replace("食圈儿 ", "");
-
-              let typeText = "";
-              switch (type) {
-                case "opening":
-                  typeText = "开店盘点";
-                  break;
-                case "closing":
-                  typeText = "闭店盘点";
-                  break;
-                case "restocking":
-                  typeText = "进货盘点";
-                  break;
-                default:
-                  typeText = type || "未知类型";
-              }
-
-              return `
-                <tr data-type="${type}">
-                  <td>${time}</td>
-                  <td>${typeText}</td>
-                  <td>${operatorName}</td>
-                  <td>${displayStoreName}</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn btn-danger action-btn" onclick="deleteLog('${log.id}')">删除</button>
-                    </div>
-                  </td>
-                </tr>
-              `;
-            })
-            .join("");
+          renderLogs();
         } catch (error) {
           console.error("加载系统日志失败:", error);
           alert("加载系统日志失败: " + error.message);
@@ -1218,7 +1046,8 @@
           const log = await query.get(logId);
           await log.destroy();
 
-          // 从当前日志列表中移除
+          // 从原始数据和当前数据中移除
+          originalLogs = originalLogs.filter((l) => l.id !== logId);
           currentLogs = currentLogs.filter((l) => l.id !== logId);
 
           // 重新过滤和显示
@@ -1447,6 +1276,9 @@
             loadUsers().catch((e) => console.error("加载用户列表失败:", e)),
             loadStores().catch((e) => console.error("加载店铺列表失败:", e)),
             loadLogs().catch((e) => console.error("加载日志失败:", e)),
+            loadTodaySalesStats().catch((e) =>
+              console.error("加载今日销售统计失败:", e)
+            ),
           ]);
 
           setDefaultDateRange();
@@ -1518,12 +1350,211 @@
       function closeUserModal() {
         document.getElementById("userModal").style.display = "none";
       }
-    </script>
-  </body>
-</html>
 
-      function closeUserModal() {
-        document.getElementById("userModal").style.display = "none";
+      // 修改 setDefaultDateRange 函数
+      function setDefaultDateRange() {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 3); // 改为3天前（原来是30天）
+
+        // 格式化日期为 YYYY-MM-DD 格式
+        document.getElementById("endDate").value = endDate
+          .toISOString()
+          .split("T")[0];
+        document.getElementById("startDate").value = startDate
+          .toISOString()
+          .split("T")[0];
+
+        // 立即触发过滤
+        filterLogs();
+      }
+
+      // 添加 updateStatistics 函数
+      function updateStatistics(logs) {
+        const stats = {
+          total: logs.length,
+          opening: 0,
+          closing: 0,
+          restocking: 0,
+        };
+
+        // 统计各类型的数量
+        logs.forEach((log) => {
+          const type = log.get("type");
+          if (type === "opening") stats.opening++;
+          else if (type === "closing") stats.closing++;
+          else if (type === "restocking") stats.restocking++;
+        });
+
+        // 更新 DOM
+        document.getElementById("totalCount").textContent = stats.total;
+        document.getElementById("openingCount").textContent = stats.opening;
+        document.getElementById("closingCount").textContent = stats.closing;
+        document.getElementById("restockingCount").textContent =
+          stats.restocking;
+      }
+
+      // 添加 renderLogs 函数（如果还没有的话）
+      function renderLogs() {
+        const logsList = document.getElementById("logsList");
+        if (!currentLogs || currentLogs.length === 0) {
+          logsList.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align: center;">暂无盘点记录</td>
+            </tr>
+          `;
+          return;
+        }
+
+        logsList.innerHTML = currentLogs
+          .map((log) => {
+            const time = new Date(log.createdAt).toLocaleString();
+            const operator = log.get("operator");
+            const operatorName = operator
+              ? operator.get("name") || operator.get("username")
+              : "未知";
+            const type = log.get("type");
+            const storeName = log.get("storeName") || "未知店铺";
+            const displayStoreName = storeName.replace("食圈儿 ", "");
+
+            let typeText = "";
+            switch (type) {
+              case "opening":
+                typeText = "开店盘点";
+                break;
+              case "closing":
+                typeText = "闭店盘点";
+                break;
+              case "restocking":
+                typeText = "进货盘点";
+                break;
+              default:
+                typeText = type || "未知类型";
+            }
+
+            return `
+              <tr data-type="${type}">
+                <td>${time}</td>
+                <td>${typeText}</td>
+                <td>${operatorName}</td>
+                <td>${displayStoreName}</td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="btn btn-primary action-btn" onclick="editLog('${log.id}')">编辑</button>
+                  </div>
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="btn btn-danger action-btn" onclick="deleteLog('${log.id}')">删除</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      // 添加排序状态变量
+      let currentSort = { field: "time", ascending: false }; // 默认按时间降序
+
+      // 添加 sortLogs 函数
+      function sortLogs(field) {
+        // 更新排序状态
+        if (currentSort.field === field) {
+          currentSort.ascending = !currentSort.ascending;
+        } else {
+          currentSort.field = field;
+          currentSort.ascending = true;
+        }
+
+        // 更新排序图标
+        document.querySelectorAll(".sort-icon").forEach((icon) => {
+          icon.textContent = "";
+        });
+        const currentIcon = document.querySelector(
+          `th[onclick="sortLogs('${field}')"] .sort-icon`
+        );
+        currentIcon.textContent = currentSort.ascending ? "↑" : "↓";
+
+        // 排序数据
+        currentLogs.sort((a, b) => {
+          let valueA, valueB;
+
+          switch (field) {
+            case "time":
+              valueA = new Date(a.createdAt).getTime();
+              valueB = new Date(b.createdAt).getTime();
+              break;
+            case "type":
+              valueA = getTypeText(a.get("type"));
+              valueB = getTypeText(b.get("type"));
+              break;
+            case "operator":
+              valueA = (
+                a.get("operator")?.get("name") ||
+                a.get("operator")?.get("username") ||
+                "未知"
+              ).toLowerCase();
+              valueB = (
+                b.get("operator")?.get("name") ||
+                b.get("operator")?.get("username") ||
+                "未知"
+              ).toLowerCase();
+              break;
+            case "store":
+              valueA = (a.get("storeName") || "未知店铺").toLowerCase();
+              valueB = (b.get("storeName") || "未知店铺").toLowerCase();
+              break;
+            default:
+              valueA = "";
+              valueB = "";
+          }
+
+          if (valueA < valueB) return currentSort.ascending ? -1 : 1;
+          if (valueA > valueB) return currentSort.ascending ? 1 : -1;
+          return 0;
+        });
+
+        // 重新渲染表格
+        renderLogs();
+      }
+
+      // 添加辅助函数来获取类型的显示文本
+      function getTypeText(type) {
+        switch (type) {
+          case "opening":
+            return "开店盘点";
+          case "closing":
+            return "闭店盘点";
+          case "restocking":
+            return "进货盘点";
+          default:
+            return type || "未知类型";
+        }
+      }
+
+      // 加载今日销售统计数据
+      async function loadTodaySalesStats() {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          const query = new AV.Query("DailyProductSales");
+          query.greaterThanOrEqualTo("date", today);
+          query.lessThan(
+            "date",
+            new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          );
+
+          // 使用 distinct 查询不同的店铺数量
+          const stores = await query.distinct("storeName");
+
+          document.getElementById("todaySalesCount").textContent =
+            stores.length;
+        } catch (error) {
+          console.error("加载今日销售统计失败:", error);
+          document.getElementById("todaySalesCount").textContent = "加载失败";
+        }
       }
     </script>
   </body>
