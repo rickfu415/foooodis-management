@@ -100,6 +100,27 @@
       .warning {
         color: #ffc107;
       }
+
+      .input-group {
+        margin: 20px 0;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .card {
+        margin-bottom: 20px;
+      }
+
+      .card h2 {
+        margin-bottom: 15px;
+        color: #333;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
   </head>
@@ -114,32 +135,119 @@
     </header>
 
     <div class="container">
-      <h2>修复历史盘点记录的店铺名称</h2>
+      <div class="card">
+        <h2>修复历史盘点记录的店铺名称</h2>
 
-      <div class="progress-container">
-        <div class="progress-bar">
-          <div id="progressBar" class="progress"></div>
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div id="progressBar" class="progress"></div>
+          </div>
+          <div id="progressText" style="text-align: center; margin-top: 10px">
+            准备开始...
+          </div>
         </div>
-        <div id="progressText" style="text-align: center; margin-top: 10px">
-          准备开始...
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px">
+          <button
+            id="createStoreClassBtn"
+            class="btn btn-primary"
+            onclick="createStoreClass()"
+          >
+            创建Store Class
+          </button>
+          <button id="startButton" class="btn btn-primary" onclick="startFix()">
+            开始修复
+          </button>
+          <button
+            id="importSalesButton"
+            class="btn btn-primary"
+            onclick="importHistoricalSales()"
+          >
+            导入历史销售数据
+          </button>
+        </div>
+
+        <div class="log-container" id="logContainer">
+          <!-- 日志将在这里显示 -->
         </div>
       </div>
 
-      <div style="display: flex; gap: 10px; margin-bottom: 20px">
-        <button
-          id="createStoreClassBtn"
-          class="btn btn-primary"
-          onclick="createStoreClass()"
-        >
-          创建Store Class
-        </button>
-        <button id="startButton" class="btn btn-primary" onclick="startFix()">
-          开始修复
-        </button>
-      </div>
+      <div class="card">
+        <h2>导入历史销售数据</h2>
 
-      <div class="log-container" id="logContainer">
-        <!-- 日志将在这里显示 -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px">
+          <button
+            id="createDailyProductSalesClassBtn"
+            class="btn btn-primary"
+            onclick="createDailyProductSalesClass()"
+          >
+            创建 DailyProductSales Class
+          </button>
+        </div>
+
+        <div class="input-group" style="margin: 20px 0">
+          <label
+            for="salesFolderPath"
+            style="display: block; margin-bottom: 10px"
+            >数据文件夹路径：</label
+          >
+          <div style="display: flex; gap: 10px">
+            <input
+              type="text"
+              id="salesFolderPath"
+              class="form-control"
+              style="
+                flex: 1;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+              "
+              placeholder="例如：F:/Dropbox/LifeCoreValue/ChengduSubway/Model/foooodis/data/sales/"
+            />
+            <button class="btn btn-primary" onclick="scanSalesFolder()">
+              扫描文件夹
+            </button>
+          </div>
+        </div>
+
+        <div class="input-group" style="margin: 20px 0">
+          <label for="salesDataPath" style="display: block; margin-bottom: 10px"
+            >单个文件导入：</label
+          >
+          <div style="display: flex; gap: 10px">
+            <input
+              type="text"
+              id="salesDataPath"
+              class="form-control"
+              style="
+                flex: 1;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+              "
+              placeholder="例如：F:/Dropbox/LifeCoreValue/ChengduSubway/Model/foooodis/data/sales_2024_03.xlsx"
+            />
+            <button class="btn btn-primary" onclick="loadSalesFile()">
+              加载文件
+            </button>
+          </div>
+        </div>
+
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div id="salesProgressBar" class="progress"></div>
+          </div>
+          <div
+            id="salesProgressText"
+            style="text-align: center; margin-top: 10px"
+          >
+            等待操作...
+          </div>
+        </div>
+
+        <div class="log-container" id="salesLogContainer">
+          <!-- 销售数据导入日志将在这里显示 -->
+        </div>
       </div>
     </div>
 
@@ -332,10 +440,407 @@
         }
       }
 
+      // 导入历史销售数据
+      async function importHistoricalSales() {
+        try {
+          document.getElementById("importSalesButton").disabled = true;
+          addLog("开始导入历史销售数据...");
+
+          // 读取历史数据文件夹中的文件
+          const response = await fetch("db/historical_sales/");
+          if (!response.ok) {
+            throw new Error("无法访问历史数据文件夹");
+          }
+
+          const files = await response.json();
+          addLog(`找到 ${files.length} 个数据文件`);
+
+          // 创建 DailyProductSales class
+          const DailyProductSales = AV.Object.extend("DailyProductSales");
+
+          // 遍历每个文件
+          for (const file of files) {
+            try {
+              const fileResponse = await fetch(`db/historical_sales/${file}`);
+              const salesData = await fileResponse.json();
+
+              addLog(`处理文件: ${file}`);
+
+              // 解析文件名中的日期和店铺信息
+              const [date, storeName] = file.replace(".json", "").split("_");
+              const salesDate = new Date(date);
+
+              // 检查是否已存在该日期和店铺的数据
+              const query = new AV.Query("DailyProductSales");
+              query.equalTo("date", salesDate);
+              query.equalTo("storeName", `食圈儿 ${storeName}`);
+              const existingData = await query.find();
+
+              // 如果已存在数据，则跳过
+              if (existingData.length > 0) {
+                addLog(`${date} ${storeName} 的数据已存在，跳过`, "warning");
+                continue;
+              }
+
+              // 导入数据
+              for (const item of salesData) {
+                const sale = new DailyProductSales();
+                sale.set("date", salesDate);
+                sale.set("storeName", `食圈儿 ${storeName}`);
+                sale.set("productName", item.productName);
+                sale.set("category", item.category);
+                sale.set("source", item.source);
+                sale.set("quantity", item.quantity);
+                sale.set("price", item.price);
+                await sale.save();
+              }
+
+              addLog(
+                `成功导入 ${salesData.length} 条数据: ${date} ${storeName}`,
+                "success"
+              );
+            } catch (error) {
+              addLog(`处理文件 ${file} 失败: ${error.message}`, "error");
+            }
+          }
+
+          addLog("历史销售数据导入完成！", "success");
+        } catch (error) {
+          console.error("导入历史销售数据失败:", error);
+          addLog(`导入失败: ${error.message}`, "error");
+        } finally {
+          document.getElementById("importSalesButton").disabled = false;
+        }
+      }
+
+      // 添加销售日志
+      function addSalesLog(message, type = "") {
+        const logContainer = document.getElementById("salesLogContainer");
+        const logEntry = document.createElement("div");
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = message;
+        logContainer.insertBefore(logEntry, logContainer.firstChild);
+      }
+
+      // 更新销售导入进度
+      function updateSalesProgress(current, total) {
+        const percentage = (current / total) * 100;
+        document.getElementById("salesProgressBar").style.width =
+          percentage + "%";
+        document.getElementById(
+          "salesProgressText"
+        ).textContent = `处理进度: ${current}/${total} (${percentage.toFixed(
+          1
+        )}%)`;
+      }
+
+      // 加载并处理销售数据文件
+      async function loadSalesFile() {
+        try {
+          const fileInput = document.createElement("input");
+          fileInput.type = "file";
+          fileInput.accept = ".xlsx,.xls";
+          fileInput.onchange = async function (e) {
+            try {
+              const file = e.target.files[0];
+              addSalesLog(`开始处理文件: ${file.name}`);
+
+              // 使用 XLSX 读取文件
+              const data = await readExcelFile(file);
+              if (data && data.length > 0) {
+                await importSalesData(data);
+                addSalesLog(`文件处理完成: ${file.name}`, "success");
+              } else {
+                addSalesLog(`文件中没有找到有效数据: ${file.name}`, "warning");
+              }
+            } catch (error) {
+              addSalesLog(`处理文件失败: ${error.message}`, "error");
+            }
+          };
+
+          fileInput.click();
+        } catch (error) {
+          addSalesLog(`加载文件失败: ${error.message}`, "error");
+        }
+      }
+
+      // 导入销售数据
+      async function importSalesData(salesData) {
+        try {
+          addSalesLog("开始导入数据到 LeanCloud...");
+
+          // 确保 DailyProductSales class 存在
+          const DailyProductSales = AV.Object.extend("DailyProductSales");
+
+          // 尝试查询，如果失败则创建 class
+          try {
+            const query = new AV.Query("DailyProductSales");
+            await query.first();
+          } catch (error) {
+            if (error.code === 404) {
+              const created = await createDailyProductSalesClass();
+              if (!created) {
+                throw new Error("无法创建 DailyProductSales Class");
+              }
+            }
+          }
+
+          let successCount = 0;
+          let errorCount = 0;
+          const batchSize = 100; // 每批处理100条记录
+          const batches = [];
+
+          // 将数据分批
+          for (let i = 0; i < salesData.length; i += batchSize) {
+            batches.push(salesData.slice(i, i + batchSize));
+          }
+
+          addSalesLog(
+            `将分 ${batches.length} 批处理数据，每批 ${batchSize} 条`
+          );
+
+          // 处理每一批数据
+          for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batch = batches[batchIndex];
+            const batchObjects = [];
+            const existingRecords = new Set();
+
+            // 先批量查询已存在的记录
+            const queries = batch.map((item) => {
+              const query = new AV.Query("DailyProductSales");
+              query.equalTo("date", new Date(item.date));
+              query.equalTo("storeName", item.storeName);
+              query.equalTo("productName", item.productName);
+              return query;
+            });
+
+            const compositeQuery = AV.Query.or(...queries);
+            const existing = await compositeQuery.find();
+
+            // 记录已存在的记录标识
+            existing.forEach((record) => {
+              const key = `${record.get("date").toISOString()}_${record.get(
+                "storeName"
+              )}_${record.get("productName")}`;
+              existingRecords.add(key);
+            });
+
+            // 创建新记录
+            for (const item of batch) {
+              const key = `${new Date(item.date).toISOString()}_${
+                item.storeName
+              }_${item.productName}`;
+              if (!existingRecords.has(key)) {
+                const sale = new DailyProductSales();
+                sale.set("date", new Date(item.date));
+                sale.set("storeName", item.storeName);
+                sale.set("productName", item.productName);
+                sale.set("category", item.category);
+                sale.set("source", item.source);
+                sale.set("quantity", item.quantity);
+                sale.set("price", item.price);
+                batchObjects.push(sale);
+              } else {
+                addSalesLog(
+                  `跳过重复记录: ${item.date} ${item.storeName} ${item.productName}`,
+                  "warning"
+                );
+              }
+            }
+
+            if (batchObjects.length > 0) {
+              try {
+                await AV.Object.saveAll(batchObjects);
+                successCount += batchObjects.length;
+                addSalesLog(
+                  `成功导入第 ${batchIndex + 1}/${
+                    batches.length
+                  } 批数据，本批导入 ${batchObjects.length} 条记录`,
+                  "success"
+                );
+              } catch (error) {
+                errorCount += batchObjects.length;
+                addSalesLog(`批量导入失败: ${error.message}`, "error");
+              }
+            }
+
+            // 更新进度
+            updateSalesProgress(
+              Math.min((batchIndex + 1) * batchSize, salesData.length),
+              salesData.length
+            );
+          }
+
+          addSalesLog(
+            `导入完成！成功: ${successCount}, 失败: ${errorCount}`,
+            successCount > 0 ? "success" : "error"
+          );
+        } catch (error) {
+          addSalesLog(`导入过程发生错误: ${error.message}`, "error");
+        }
+      }
+
+      // 扫描销售数据文件夹
+      async function scanSalesFolder() {
+        try {
+          // 创建文件夹选择器
+          const folderInput = document.createElement("input");
+          folderInput.type = "file";
+          folderInput.webkitdirectory = true;
+          folderInput.multiple = true;
+
+          folderInput.onchange = async function (e) {
+            try {
+              const files = Array.from(e.target.files).filter(
+                (file) =>
+                  file.name.endsWith(".xlsx") || file.name.endsWith(".xls")
+              );
+
+              if (files.length === 0) {
+                addSalesLog("未找到Excel文件", "warning");
+                return;
+              }
+
+              addSalesLog(`找到 ${files.length} 个Excel文件，开始处理...`);
+
+              // 按文件名排序（假设文件名包含日期）
+              files.sort((a, b) => a.name.localeCompare(b.name));
+
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (let i = 0; i < files.length; i++) {
+                try {
+                  const file = files[i];
+                  addSalesLog(
+                    `处理文件 ${i + 1}/${files.length}: ${file.name}`
+                  );
+
+                  // 使用 XLSX 库读取 Excel 文件
+                  const data = await readExcelFile(file);
+                  if (data && data.length > 0) {
+                    await importSalesData(data);
+                    successCount++;
+                  }
+
+                  // 更新总进度
+                  updateSalesProgress(i + 1, files.length);
+                } catch (error) {
+                  errorCount++;
+                  addSalesLog(
+                    `处理文件 ${files[i].name} 失败: ${error.message}`,
+                    "error"
+                  );
+                }
+              }
+
+              addSalesLog(
+                `所有文件处理完成！成功: ${successCount}, 失败: ${errorCount}`,
+                successCount > 0 ? "success" : "error"
+              );
+            } catch (error) {
+              addSalesLog(`扫描文件夹失败: ${error.message}`, "error");
+            }
+          };
+
+          folderInput.click();
+        } catch (error) {
+          addSalesLog(`选择文件夹失败: ${error.message}`, "error");
+        }
+      }
+
+      // 读取Excel文件
+      async function readExcelFile(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = async function (e) {
+            try {
+              const data = e.target.result;
+              const workbook = XLSX.read(data, { type: "array" });
+              const firstSheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheetName];
+
+              // 将 Excel 数据转换为对象数组
+              const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+              // 处理数据，使用英文列名
+              const processedData = rawData.map((row) => ({
+                date: row["Date"] || "",
+                storeName: `食圈儿 ${row["Store"] || ""}`,
+                productName: row["Product"] || "",
+                category: mapCategory(row["Category"] || ""),
+                source: mapSource(row["Source"] || ""),
+                quantity: parseInt(row["Sale"] || 0),
+                price: parseFloat(row["Price"] || 0),
+              }));
+
+              resolve(processedData);
+            } catch (error) {
+              reject(error);
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      // 映射类型
+      function mapCategory(rawCategory) {
+        const categoryMap = {
+          主食: "main_dish",
+          小吃: "snack",
+          饮品: "drink",
+          "Main Dish": "main_dish",
+          Snack: "snack",
+          Drink: "drink",
+        };
+        return categoryMap[rawCategory] || rawCategory.toLowerCase();
+      }
+
+      // 映射来源
+      function mapSource(rawSource) {
+        const sourceMap = {
+          自制: "self_made",
+          外采: "purchased",
+          "Self Made": "self_made",
+          Purchased: "purchased",
+        };
+        return sourceMap[rawSource] || rawSource.toLowerCase();
+      }
+
+      // 添加 XLSX 库
+      const script = document.createElement("script");
+      script.src =
+        "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      document.head.appendChild(script);
+
       // 页面加载时执行
       window.onload = async function () {
         await checkAdmin();
       };
+
+      // 在 script 标签中添加新函数
+      async function createDailyProductSalesClass() {
+        try {
+          addSalesLog("开始创建 DailyProductSales Class...");
+
+          // 创建一个临时对象并保存，这样会自动创建 class
+          const DailyProductSales = AV.Object.extend("DailyProductSales");
+          const tempSale = new DailyProductSales();
+          tempSale.set("temp", true);
+          await tempSale.save();
+          await tempSale.destroy();
+
+          addSalesLog("DailyProductSales Class 创建成功", "success");
+          return true;
+        } catch (error) {
+          addSalesLog(
+            `创建 DailyProductSales Class 失败: ${error.message}`,
+            "error"
+          );
+          return false;
+        }
+      }
     </script>
   </body>
 </html>
