@@ -192,6 +192,9 @@
           <button class="btn btn-success" onclick="saveSalesData()">
             保存
           </button>
+          <button class="btn btn-primary" onclick="saveProductsToDatabase()">
+            保存商品到数据库
+          </button>
         </div>
       </div>
 
@@ -435,6 +438,79 @@
           alert("页面加载失败，请刷新重试");
         }
       };
+
+      // 添加新函数
+      async function saveProductsToDatabase() {
+        try {
+          const tbody = document.getElementById("salesTable");
+          if (!tbody.children.length) {
+            alert("请先查询销售数据");
+            return;
+          }
+
+          // 确保 Product class 存在
+          try {
+            const query = new AV.Query("Product");
+            await query.first();
+          } catch (error) {
+            if (error.code === 404) {
+              // 创建 Product class
+              const Product = AV.Object.extend("Product");
+              const tempProduct = new Product();
+              tempProduct.set("temp", true);
+              await tempProduct.save();
+              await tempProduct.destroy();
+            }
+          }
+
+          // 从表格中提取商品信息
+          const uniqueProducts = new Map();
+          Array.from(tbody.children).forEach((row) => {
+            const cells = row.cells;
+            const productName = cells[0].textContent;
+            if (!uniqueProducts.has(productName)) {
+              uniqueProducts.set(productName, {
+                name: productName,
+                category: cells[1].textContent,
+                source:
+                  cells[2].textContent === "自制" ? "self_made" : "purchased",
+                price: parseFloat(cells[4].textContent),
+              });
+            }
+          });
+
+          // 检查现有商品
+          const Product = AV.Object.extend("Product");
+          const productQuery = new AV.Query(Product);
+          const existingProducts = await productQuery.find();
+          const existingProductNames = new Set(
+            existingProducts.map((p) => p.get("name"))
+          );
+
+          // 批量保存新商品
+          const newProducts = [];
+          for (const [name, data] of uniqueProducts) {
+            if (!existingProductNames.has(name)) {
+              const product = new Product();
+              product.set("name", data.name);
+              product.set("category", data.category);
+              product.set("source", data.source);
+              product.set("price", data.price);
+              newProducts.push(product);
+            }
+          }
+
+          if (newProducts.length > 0) {
+            await AV.Object.saveAll(newProducts);
+            alert(`成功添加 ${newProducts.length} 个新商品到数据库`);
+          } else {
+            alert("没有新商品需要添加");
+          }
+        } catch (error) {
+          console.error("保存商品失败:", error);
+          alert("保存商品失败: " + error.message);
+        }
+      }
     </script>
   </body>
 </html>

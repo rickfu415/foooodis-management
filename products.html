@@ -125,6 +125,67 @@
         padding-bottom: 10px;
         border-bottom: 2px solid #eee;
       }
+
+      /* 新增表格样式 */
+      .table-container {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      th,
+      td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+      }
+
+      th {
+        background-color: #f8f9fa;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      th:hover {
+        background-color: #e9ecef;
+      }
+
+      .filter-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .filter-input {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        min-width: 120px;
+      }
+
+      .pagination {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 20px;
+        justify-content: center;
+      }
+
+      .btn-sm {
+        padding: 4px 8px;
+        font-size: 14px;
+      }
+
+      .sort-icon {
+        display: inline-block;
+        width: 10px;
+        margin-left: 5px;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
     <script>
@@ -206,8 +267,84 @@
       <!-- 商品列表 -->
       <div class="product-list">
         <h3 class="section-title">商品列表</h3>
-        <div id="productList">
-          <!-- 商品列表将通过 JavaScript 动态生成 -->
+
+        <!-- 筛选器 -->
+        <div class="filter-group">
+          <select
+            id="categoryFilter"
+            class="filter-input"
+            onchange="filterProducts()"
+          >
+            <option value="all">所有类别</option>
+            <option value="main_dish">主食类</option>
+            <option value="snack">小吃类</option>
+            <option value="drink">饮品类</option>
+            <option value="bakery">烘焙类</option>
+          </select>
+          <select
+            id="sourceFilter"
+            class="filter-input"
+            onchange="filterProducts()"
+          >
+            <option value="all">所有来源</option>
+            <option value="self_made">自制</option>
+            <option value="purchased">外采</option>
+          </select>
+          <input
+            type="text"
+            id="searchInput"
+            class="filter-input"
+            placeholder="搜索商品名称..."
+            oninput="filterProducts()"
+          />
+          <div style="margin-left: auto">
+            <span>每页显示：</span>
+            <select
+              id="pageSize"
+              class="filter-input"
+              onchange="updatePageSize()"
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 表格 -->
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th onclick="sortProducts('name')">
+                  商品名称 <span id="sortName"></span>
+                </th>
+                <th onclick="sortProducts('category')">
+                  类型 <span id="sortCategory"></span>
+                </th>
+                <th onclick="sortProducts('source')">
+                  来源 <span id="sortSource"></span>
+                </th>
+                <th onclick="sortProducts('price')">
+                  单价 <span id="sortPrice"></span>
+                </th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="productList">
+              <!-- 商品列表将通过 JavaScript 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页控件 -->
+        <div class="pagination">
+          <button class="btn btn-sm" onclick="previousPage()">
+            &lt; 上一页
+          </button>
+          <span id="pageInfo">第 1 页，共 1 页</span>
+          <button class="btn btn-sm" onclick="nextPage()">下一页 &gt;</button>
         </div>
       </div>
     </div>
@@ -225,132 +362,197 @@
         }
       }
 
+      // 商品列表状态管理
+      const productState = {
+        allProducts: [],
+        filteredProducts: [],
+        currentPage: 1,
+        pageSize: 10,
+        sortField: "name",
+        sortDirection: "asc",
+        filters: {
+          category: "all",
+          source: "all",
+          search: "",
+        },
+      };
+
       // 获取商品列表
       async function fetchProducts() {
         try {
           const query = new AV.Query("Product");
+          query.limit(1000);
           const results = await query.find();
-          return results.map((product) => ({
+
+          productState.allProducts = results.map((product) => ({
             id: product.id,
             name: product.get("name"),
             category: product.get("category"),
+            source: product.get("source"),
             price: product.get("price"),
           }));
+
+          filterProducts();
         } catch (error) {
           console.error("获取商品列表失败:", error);
-          return [];
         }
       }
 
-      // 添加商品
-      async function addProduct(event) {
-        event.preventDefault();
-        const form = event.target;
-        const category = form.category.value;
-        const name = form.name.value;
-        const price = form.price.value;
+      // 过滤商品
+      function filterProducts() {
+        productState.filters.category =
+          document.getElementById("categoryFilter").value;
+        productState.filters.source =
+          document.getElementById("sourceFilter").value;
+        productState.filters.search = document
+          .getElementById("searchInput")
+          .value.toLowerCase();
 
-        try {
-          // 检查用户是否已登录
-          let currentUser = AV.User.current();
-          if (!currentUser) {
-            // 尝试从 localStorage 恢复用户会话
-            const userData = JSON.parse(localStorage.getItem("user") || "{}");
-            if (userData.sessionToken) {
-              try {
-                currentUser = await AV.User.become(userData.sessionToken);
-              } catch (error) {
-                console.error("Session recovery failed:", error);
-                alert("登录已过期，请重新登录");
-                window.location.href = "index.html";
-                return;
-              }
-            } else {
-              alert("请先登录");
-              window.location.href = "index.html";
-              return;
-            }
+        productState.filteredProducts = productState.allProducts.filter(
+          (product) => {
+            const categoryMatch =
+              productState.filters.category === "all" ||
+              product.category === productState.filters.category;
+            const sourceMatch =
+              productState.filters.source === "all" ||
+              product.source === productState.filters.source;
+            const searchMatch = product.name
+              .toLowerCase()
+              .includes(productState.filters.search);
+            return categoryMatch && sourceMatch && searchMatch;
           }
+        );
 
-          const Product = AV.Object.extend("Product");
-          const product = new Product();
+        sortProducts(productState.sortField, true);
+        productState.currentPage = 1;
+        renderProducts();
+      }
 
-          // 设置产品数据
-          product.set("name", name);
-          product.set("category", category);
-          product.set("price", parseInt(price));
+      // 排序商品
+      function sortProducts(field, keepDirection = false) {
+        if (!keepDirection) {
+          productState.sortDirection =
+            productState.sortField === field
+              ? productState.sortDirection === "asc"
+                ? "desc"
+                : "asc"
+              : "asc";
+        }
+        productState.sortField = field;
 
-          // 设置 ACL
-          const acl = new AV.ACL();
-          acl.setPublicReadAccess(true); // 所有人可读
-          acl.setWriteAccess(currentUser, true); // 创建者可写
-          product.setACL(acl);
+        // 更新排序图标
+        const fields = ["name", "category", "source", "price"];
+        fields.forEach((f) => {
+          const span = document.getElementById(
+            `sort${f.charAt(0).toUpperCase() + f.slice(1)}`
+          );
+          span.textContent =
+            f === field
+              ? productState.sortDirection === "asc"
+                ? " ↑"
+                : " ↓"
+              : "";
+        });
 
-          await product.save();
+        productState.filteredProducts.sort((a, b) => {
+          let comparison = 0;
+          if (field === "price") {
+            comparison = a[field] - b[field];
+          } else {
+            comparison = String(a[field]).localeCompare(String(b[field]));
+          }
+          return productState.sortDirection === "asc"
+            ? comparison
+            : -comparison;
+        });
+
+        renderProducts();
+      }
+
+      // 更新每页显示数量
+      function updatePageSize() {
+        productState.pageSize = parseInt(
+          document.getElementById("pageSize").value
+        );
+        productState.currentPage = 1;
+        renderProducts();
+      }
+
+      // 上一页
+      function previousPage() {
+        if (productState.currentPage > 1) {
+          productState.currentPage--;
           renderProducts();
-          form.reset();
-        } catch (error) {
-          console.error("添加商品失败:", error);
-          alert(error.message || "添加商品失败，请重试");
         }
       }
 
-      // 删除商品
-      async function deleteProduct(productId) {
-        if (confirm("确定要删除这个商品吗？")) {
-          try {
-            const currentUser = AV.User.current();
-            if (!currentUser) {
-              alert("请先登录");
-              window.location.href = "index.html";
-              return;
-            }
-
-            const product = AV.Object.createWithoutData("Product", productId);
-            await product.destroy();
-            renderProducts();
-          } catch (error) {
-            console.error("删除商品失败:", error);
-            alert(error.message || "删除商品失败，请重试");
-          }
+      // 下一页
+      function nextPage() {
+        const totalPages = Math.ceil(
+          productState.filteredProducts.length / productState.pageSize
+        );
+        if (productState.currentPage < totalPages) {
+          productState.currentPage++;
+          renderProducts();
         }
       }
 
       // 渲染商品列表
-      async function renderProducts() {
-        const products = await fetchProducts();
-        const listElement = document.getElementById("productList");
+      function renderProducts() {
+        const tbody = document.getElementById("productList");
+        const start = (productState.currentPage - 1) * productState.pageSize;
+        const end = start + productState.pageSize;
+        const pageProducts = productState.filteredProducts.slice(start, end);
 
-        if (products.length === 0) {
-          listElement.innerHTML =
-            '<p style="color: #666; text-align: center;">暂无商品</p>';
-          return;
-        }
-
-        listElement.innerHTML = products
+        tbody.innerHTML = pageProducts
           .map(
             (product) => `
-            <div class="product-item">
-              <div class="product-info">
-                <div class="product-name">${product.name}</div>
-                <div class="product-details">
-                  ${product.category === "drinks" ? "饮品" : "烘焙"} · ${
-              product.price
-            }元
-                </div>
-              </div>
-              <button class="btn btn-delete" onclick="deleteProduct('${
+          <tr>
+            <td>${product.name}</td>
+            <td>${getCategoryText(product.category)}</td>
+            <td>${getSourceText(product.source)}</td>
+            <td>¥${product.price.toFixed(2)}</td>
+            <td>
+              <button class="btn btn-sm btn-primary" onclick="editProduct('${
+                product.id
+              }')">编辑</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteProduct('${
                 product.id
               }')">删除</button>
-            </div>
-          `
+            </td>
+          </tr>
+        `
           )
           .join("");
+
+        // 更新分页信息
+        const totalPages = Math.ceil(
+          productState.filteredProducts.length / productState.pageSize
+        );
+        document.getElementById(
+          "pageInfo"
+        ).textContent = `第 ${productState.currentPage} 页，共 ${totalPages} 页 (共 ${productState.filteredProducts.length} 条)`;
+      }
+
+      // 获取类型文本
+      function getCategoryText(category) {
+        const categoryMap = {
+          main_dish: "主食类",
+          snack: "小吃类",
+          drink: "饮品类",
+          bakery: "烘焙类",
+        };
+        return categoryMap[category] || category;
+      }
+
+      // 获取来源文本
+      function getSourceText(source) {
+        return source === "self_made" ? "自制" : "外采";
       }
 
       // 页面加载时执行
       checkAdmin();
-      renderProducts();
+      fetchProducts();
     </script>
   </body>
 </html>

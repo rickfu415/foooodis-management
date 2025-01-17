@@ -121,6 +121,33 @@
         margin-bottom: 15px;
         color: #333;
       }
+
+      .filter-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .filter-input {
+        padding: 6px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .pagination {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .btn-sm {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      th {
+        cursor: pointer;
+        user-select: none;
+      }
+      th:hover {
+        background-color: #f0f0f0;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
   </head>
@@ -247,6 +274,112 @@
 
         <div class="log-container" id="salesLogContainer">
           <!-- 销售数据导入日志将在这里显示 -->
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>商品管理</h2>
+        <div style="margin-bottom: 20px">
+          <button
+            id="createProductClassBtn"
+            class="btn btn-primary"
+            onclick="createProductClass()"
+          >
+            创建 Product Class
+          </button>
+          <button class="btn btn-primary" onclick="extractAndUpdateProducts()">
+            从销售数据提取商品
+          </button>
+        </div>
+
+        <!-- 商品列表表格 -->
+        <div class="table-container">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+            "
+          >
+            <div class="filter-group">
+              <select
+                id="categoryFilter"
+                class="filter-input"
+                onchange="filterProducts()"
+              >
+                <option value="all">所有类别</option>
+                <option value="main_dish">主食类</option>
+                <option value="snack">小吃类</option>
+                <option value="drink">饮品类</option>
+                <option value="bakery">烘焙类</option>
+              </select>
+              <select
+                id="sourceFilter"
+                class="filter-input"
+                onchange="filterProducts()"
+              >
+                <option value="all">所有来源</option>
+                <option value="self_made">自制</option>
+                <option value="purchased">外采</option>
+              </select>
+              <input
+                type="text"
+                id="searchInput"
+                class="filter-input"
+                placeholder="搜索商品名称..."
+                oninput="filterProducts()"
+              />
+            </div>
+            <div class="pagination">
+              <span>每页显示：</span>
+              <select
+                id="pageSize"
+                class="filter-input"
+                onchange="updatePageSize()"
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th onclick="sortProducts('name')">
+                  商品名称 <span id="sortName"></span>
+                </th>
+                <th onclick="sortProducts('category')">
+                  类型 <span id="sortCategory"></span>
+                </th>
+                <th onclick="sortProducts('source')">
+                  来源 <span id="sortSource"></span>
+                </th>
+                <th onclick="sortProducts('price')">
+                  单价 <span id="sortPrice"></span>
+                </th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="productsTable">
+              <!-- 商品列表将通过 JavaScript 动态生成 -->
+            </tbody>
+          </table>
+
+          <div class="pagination" style="margin-top: 10px">
+            <button class="btn btn-sm" onclick="previousPage()">
+              &lt; 上一页
+            </button>
+            <span id="pageInfo">第 1 页，共 1 页</span>
+            <button class="btn btn-sm" onclick="nextPage()">下一页 &gt;</button>
+          </div>
+        </div>
+
+        <div class="log-container" id="productLogContainer">
+          <!-- 商品管理日志将在这里显示 -->
         </div>
       </div>
     </div>
@@ -839,6 +972,481 @@
             "error"
           );
           return false;
+        }
+      }
+
+      // 商品列表状态管理
+      const productState = {
+        allProducts: [],
+        filteredProducts: [],
+        currentPage: 1,
+        pageSize: 10,
+        sortField: "name",
+        sortDirection: "asc",
+        filters: {
+          category: "all",
+          source: "all",
+          search: "",
+        },
+      };
+
+      // 加载商品列表
+      async function loadProducts() {
+        try {
+          const query = new AV.Query("Product");
+          query.limit(1000);
+          const products = await query.find();
+
+          productState.allProducts = products.map((p) => ({
+            id: p.id,
+            name: p.get("name"),
+            category: p.get("category"),
+            source: p.get("source"),
+            price: p.get("price"),
+          }));
+
+          filterProducts();
+        } catch (error) {
+          console.error("加载商品列表失败:", error);
+          alert("加载商品列表失败");
+        }
+      }
+
+      // 过滤商品
+      function filterProducts() {
+        productState.filters.category =
+          document.getElementById("categoryFilter").value;
+        productState.filters.source =
+          document.getElementById("sourceFilter").value;
+        productState.filters.search = document
+          .getElementById("searchInput")
+          .value.toLowerCase();
+
+        productState.filteredProducts = productState.allProducts.filter(
+          (product) => {
+            const categoryMatch =
+              productState.filters.category === "all" ||
+              product.category === productState.filters.category;
+            const sourceMatch =
+              productState.filters.source === "all" ||
+              product.source === productState.filters.source;
+            const searchMatch = product.name
+              .toLowerCase()
+              .includes(productState.filters.search);
+            return categoryMatch && sourceMatch && searchMatch;
+          }
+        );
+
+        sortProducts(productState.sortField, true);
+        productState.currentPage = 1;
+        renderProducts();
+      }
+
+      // 排序商品
+      function sortProducts(field, keepDirection = false) {
+        if (!keepDirection) {
+          productState.sortDirection =
+            productState.sortField === field
+              ? productState.sortDirection === "asc"
+                ? "desc"
+                : "asc"
+              : "asc";
+        }
+        productState.sortField = field;
+
+        // 更新排序图标
+        const fields = ["name", "category", "source", "price"];
+        fields.forEach((f) => {
+          const span = document.getElementById(
+            `sort${f.charAt(0).toUpperCase() + f.slice(1)}`
+          );
+          span.textContent =
+            f === field
+              ? productState.sortDirection === "asc"
+                ? " ↑"
+                : " ↓"
+              : "";
+        });
+
+        productState.filteredProducts.sort((a, b) => {
+          let comparison = 0;
+          if (field === "price") {
+            comparison = a[field] - b[field];
+          } else {
+            comparison = String(a[field]).localeCompare(String(b[field]));
+          }
+          return productState.sortDirection === "asc"
+            ? comparison
+            : -comparison;
+        });
+
+        renderProducts();
+      }
+
+      // 更新每页显示数量
+      function updatePageSize() {
+        productState.pageSize = parseInt(
+          document.getElementById("pageSize").value
+        );
+        productState.currentPage = 1;
+        renderProducts();
+      }
+
+      // 上一页
+      function previousPage() {
+        if (productState.currentPage > 1) {
+          productState.currentPage--;
+          renderProducts();
+        }
+      }
+
+      // 下一页
+      function nextPage() {
+        const totalPages = Math.ceil(
+          productState.filteredProducts.length / productState.pageSize
+        );
+        if (productState.currentPage < totalPages) {
+          productState.currentPage++;
+          renderProducts();
+        }
+      }
+
+      // 渲染商品列表
+      function renderProducts() {
+        const tbody = document.getElementById("productsTable");
+        const start = (productState.currentPage - 1) * productState.pageSize;
+        const end = start + productState.pageSize;
+        const pageProducts = productState.filteredProducts.slice(start, end);
+
+        tbody.innerHTML = pageProducts
+          .map(
+            (product) => `
+          <tr>
+            <td>${product.name}</td>
+            <td>${getCategoryText(product.category)}</td>
+            <td>${getSourceText(product.source)}</td>
+            <td>¥${product.price.toFixed(2)}</td>
+            <td>
+              <button class="btn btn-sm btn-primary" onclick="editProduct('${
+                product.id
+              }')">编辑</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteProduct('${
+                product.id
+              }')">删除</button>
+            </td>
+          </tr>
+        `
+          )
+          .join("");
+
+        // 更新分页信息
+        const totalPages = Math.ceil(
+          productState.filteredProducts.length / productState.pageSize
+        );
+        document.getElementById(
+          "pageInfo"
+        ).textContent = `第 ${productState.currentPage} 页，共 ${totalPages} 页 (共 ${productState.filteredProducts.length} 条)`;
+      }
+
+      // 编辑商品
+      async function editProduct(id) {
+        // TODO: 实现编辑功能
+        alert("编辑功能开发中");
+      }
+
+      // 删除商品
+      async function deleteProduct(id) {
+        if (confirm("确定要删除这个商品吗？")) {
+          try {
+            const product = AV.Object.createWithoutData("Product", id);
+            await product.destroy();
+            await loadProducts();
+            alert("删除成功");
+          } catch (error) {
+            console.error("删除商品失败:", error);
+            alert("删除商品失败");
+          }
+        }
+      }
+
+      // 页面加载时加载商品列表
+      window.addEventListener("load", loadProducts);
+
+      async function createProductClass() {
+        try {
+          addSalesLog("开始创建 Product Class...");
+
+          // 创建一个临时对象并保存，这样会自动创建 class
+          const Product = AV.Object.extend("Product");
+          const tempProduct = new Product();
+          tempProduct.set("temp", true);
+          await tempProduct.save();
+          await tempProduct.destroy();
+
+          addSalesLog("Product Class 创建成功", "success");
+          return true;
+        } catch (error) {
+          addSalesLog(`创建 Product Class 失败: ${error.message}`, "error");
+          return false;
+        }
+      }
+
+      async function extractAndUpdateProducts() {
+        try {
+          addSalesLog("开始从销售数据提取商品信息...");
+
+          // 确保 Product class 存在
+          try {
+            const query = new AV.Query("Product");
+            await query.first();
+          } catch (error) {
+            if (error.code === 404) {
+              const created = await createProductClass();
+              if (!created) {
+                throw new Error("无法创建 Product Class");
+              }
+            }
+          }
+
+          // 查询所有销售数据
+          const query = new AV.Query("DailyProductSales");
+          query.limit(1000); // 最大限制
+          query.addAscending("productName"); // 按商品名称排序
+          const sales = await query.find();
+
+          addSalesLog(`找到 ${sales.length} 条销售记录`);
+
+          // 使用 Map 去重，提取唯一的商品
+          const uniqueProducts = new Map();
+          sales.forEach((sale) => {
+            const key = sale.get("productName");
+            if (!uniqueProducts.has(key)) {
+              uniqueProducts.set(key, {
+                name: sale.get("productName"),
+                category: sale.get("category"),
+                source: sale.get("source"),
+                price: sale.get("price"),
+              });
+            }
+          });
+
+          addSalesLog(`提取出 ${uniqueProducts.size} 个唯一商品`);
+
+          // 按类别统计商品数量
+          const categoryStats = new Map();
+          uniqueProducts.forEach((product) => {
+            const category = product.category;
+            categoryStats.set(category, (categoryStats.get(category) || 0) + 1);
+          });
+
+          addSalesLog("\n各类别商品数量：");
+          categoryStats.forEach((count, category) => {
+            addSalesLog(`- ${getCategoryText(category)}: ${count}个`);
+          });
+
+          // 检查现有商品
+          const Product = AV.Object.extend("Product");
+          const productQuery = new AV.Query(Product);
+          const existingProducts = await productQuery.find();
+          const existingProductNames = new Set(
+            existingProducts.map((p) => p.get("name"))
+          );
+
+          // 批量保存新商品
+          const newProducts = [];
+          for (const [name, data] of uniqueProducts) {
+            if (!existingProductNames.has(name)) {
+              const product = new Product();
+              product.set("name", data.name);
+              product.set("category", data.category);
+              product.set("source", data.source);
+              product.set("price", data.price);
+              newProducts.push(product);
+            }
+          }
+
+          if (newProducts.length > 0) {
+            await AV.Object.saveAll(newProducts);
+            addSalesLog(`成功添加 ${newProducts.length} 个新商品`, "success");
+
+            // 显示所有添加的商品
+            addSalesLog("\n新添加的商品列表：", "success");
+            newProducts.forEach((product) => {
+              addSalesLog(
+                `- ${product.get("name")} (${getCategoryText(
+                  product.get("category")
+                )}, ${getSourceText(product.get("source"))}, ¥${product.get(
+                  "price"
+                )})`,
+                "success"
+              );
+            });
+          } else {
+            addSalesLog("没有新商品需要添加", "warning");
+          }
+
+          // 显示所有商品列表
+          addSalesLog("\n当前所有商品列表：");
+          // 按类别分组显示
+          const productsByCategory = new Map();
+          Array.from(uniqueProducts.values()).forEach((product) => {
+            const category = product.category;
+            if (!productsByCategory.has(category)) {
+              productsByCategory.set(category, []);
+            }
+            productsByCategory.get(category).push(product);
+          });
+
+          // 按类别显示商品
+          productsByCategory.forEach((products, category) => {
+            addSalesLog(`\n${getCategoryText(category)}：`);
+            products.sort((a, b) => a.name.localeCompare(b.name)); // 按名称排序
+            products.forEach((product) => {
+              addSalesLog(
+                `- ${product.name} (${getSourceText(product.source)}, ¥${
+                  product.price
+                })`
+              );
+            });
+          });
+
+          addSalesLog("\n商品数据更新完成！", "success");
+        } catch (error) {
+          addSalesLog(`更新商品数据失败: ${error.message}`, "error");
+        }
+      }
+
+      async function extractProductsByCategory(category) {
+        try {
+          addSalesLog(`开始提取${getCategoryText(category)}商品信息...`);
+
+          // 确保 Product class 存在
+          try {
+            const query = new AV.Query("Product");
+            await query.first();
+          } catch (error) {
+            if (error.code === 404) {
+              const created = await createProductClass();
+              if (!created) {
+                throw new Error("无法创建 Product Class");
+              }
+            }
+          }
+
+          // 查询销售数据，使用日期范围
+          const query = new AV.Query("DailyProductSales");
+          if (category !== "all") {
+            query.equalTo("category", category);
+          }
+
+          // 设置较大的限制以获取所有数据
+          query.limit(1000);
+          query.addAscending("productName");
+
+          // 获取所有销售记录
+          let allSales = [];
+          let skip = 0;
+          let hasMore = true;
+
+          while (hasMore) {
+            query.skip(skip);
+            const sales = await query.find();
+            if (sales.length === 0) {
+              hasMore = false;
+            } else {
+              allSales = allSales.concat(sales);
+              skip += sales.length;
+              addSalesLog(`已加载 ${allSales.length} 条销售记录...`);
+            }
+          }
+
+          addSalesLog(`总共找到 ${allSales.length} 条销售记录`);
+
+          // 使用 Map 去重，提取唯一的商品
+          const uniqueProducts = new Map();
+          allSales.forEach((sale) => {
+            const key = sale.get("productName");
+            if (!uniqueProducts.has(key)) {
+              uniqueProducts.set(key, {
+                name: sale.get("productName"),
+                category: sale.get("category"),
+                source: sale.get("source"),
+                price: sale.get("price"),
+              });
+            }
+          });
+
+          addSalesLog(`提取出 ${uniqueProducts.size} 个唯一商品`);
+
+          // 检查现有商品
+          const Product = AV.Object.extend("Product");
+          const productQuery = new AV.Query(Product);
+          if (category !== "all") {
+            productQuery.equalTo("category", category);
+          }
+          const existingProducts = await productQuery.find();
+          const existingProductNames = new Set(
+            existingProducts.map((p) => p.get("name"))
+          );
+
+          // 批量保存新商品
+          const newProducts = [];
+          for (const [name, data] of uniqueProducts) {
+            if (!existingProductNames.has(name)) {
+              const product = new Product();
+              product.set("name", data.name);
+              product.set("category", data.category);
+              product.set("source", data.source);
+              product.set("price", data.price);
+              newProducts.push(product);
+            }
+          }
+
+          if (newProducts.length > 0) {
+            // 分批保存，避免超出限制
+            const batchSize = 50;
+            for (let i = 0; i < newProducts.length; i += batchSize) {
+              const batch = newProducts.slice(i, i + batchSize);
+              await AV.Object.saveAll(batch);
+              addSalesLog(
+                `成功添加第 ${i + 1} 到 ${i + batch.length} 个新商品`,
+                "success"
+              );
+            }
+            addSalesLog(`总共添加了 ${newProducts.length} 个新商品`, "success");
+          } else {
+            addSalesLog("没有新商品需要添加", "warning");
+          }
+
+          // 显示当前类别的所有商品
+          addSalesLog(`\n当前${getCategoryText(category)}商品列表：`);
+          const productList = Array.from(uniqueProducts.values());
+
+          // 按类别和名称排序
+          productList.sort((a, b) => {
+            if (a.category !== b.category) {
+              return a.category.localeCompare(b.category);
+            }
+            return a.name.localeCompare(b.name);
+          });
+
+          // 按类别分组显示
+          let currentCategory = "";
+          productList.forEach((product) => {
+            if (currentCategory !== product.category) {
+              currentCategory = product.category;
+              addSalesLog(`\n${getCategoryText(currentCategory)}：`);
+            }
+            addSalesLog(
+              `- ${product.name} (${getSourceText(product.source)}, ¥${
+                product.price
+              })`
+            );
+          });
+
+          addSalesLog("\n商品数据更新完成！", "success");
+        } catch (error) {
+          addSalesLog(`更新商品数据失败: ${error.message}`, "error");
         }
       }
     </script>
