@@ -232,7 +232,7 @@
               <tr data-id="${product.id}">
                 <td>${name}</td>
                 <td>${category}</td>
-                <td><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="stock-count" /></td>
+                <td><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="stock-count" onchange="moveToNext(this)" /></td>
                 <td><input type="text" class="note-field" placeholder="填写备注..." /></td>
               </tr>
             `;
@@ -241,6 +241,18 @@
         } catch (error) {
           console.error("加载商品列表失败:", error);
           alert("加载商品列表失败，请重试");
+        }
+      }
+
+      // 自动跳转到下一个输入框
+      function moveToNext(currentInput) {
+        const currentRow = currentInput.closest("tr");
+        const nextRow = currentRow.nextElementSibling;
+        if (nextRow) {
+          const nextInput = nextRow.querySelector(".stock-count");
+          if (nextInput) {
+            nextInput.focus();
+          }
         }
       }
 
