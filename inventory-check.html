@@ -358,7 +358,7 @@
                 <tr data-id="${product.id}">
                   <td>${name}</td>
                   <td>${category}</td>
-                  <td><input type="number" min="0" class="current-stock" /></td>
+                  <td><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="current-stock" /></td>
                   <td class="theoretical-stock">-</td>
                   <td class="stock-difference">-</td>
                   <td><input type="text" class="note-field" placeholder="填写备注..." /></td>
@@ -369,7 +369,7 @@
                 <tr data-id="${product.id}">
                   <td>${name}</td>
                   <td>${category}</td>
-                  <td><input type="number" min="0" class="stock-count" /></td>
+                  <td><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="stock-count" /></td>
                   <td><input type="text" class="note-field" placeholder="填写备注..." /></td>
                 </tr>
               `;
