@@ -301,34 +301,6 @@
           </div>
         </div>
 
-        <!-- 添加导入卡片 -->
-        <div class="card" style="margin-top: 20px">
-          <h4>导入盘点数据</h4>
-          <div class="form-group">
-            <input
-              type="file"
-              id="inventoryFile"
-              accept=".xlsx,.xls"
-              class="form-control"
-              style="margin-bottom: 10px"
-            />
-          </div>
-          <div class="button-group">
-            <button onclick="importInventoryData()" class="btn btn-primary">
-              分析文件
-            </button>
-            <button
-              id="uploadButton"
-              onclick="uploadInventoryData()"
-              class="btn btn-success"
-              style="display: none"
-            >
-              上传到数据库
-            </button>
-          </div>
-          <div id="importLogs" class="import-logs"></div>
-        </div>
-
         <div style="display: flex; gap: 10px; margin-bottom: 20px">
           <button
             id="createStoreClassBtn"
@@ -537,6 +509,34 @@
         <div class="log-container" id="productLogContainer">
           <!-- 商品管理日志将在这里显示 -->
         </div>
+      </div>
+
+      <!-- 导入盘点数据卡片 -->
+      <div class="card">
+        <h2>导入盘点数据</h2>
+        <div class="form-group">
+          <input
+            type="file"
+            id="inventoryFile"
+            accept=".xlsx,.xls"
+            class="form-control"
+            style="margin-bottom: 10px"
+          />
+        </div>
+        <div class="button-group">
+          <button onclick="importInventoryData()" class="btn btn-primary">
+            分析文件
+          </button>
+          <button
+            id="uploadButton"
+            onclick="uploadInventoryData()"
+            class="btn btn-success"
+            style="display: none"
+          >
+            上传到数据库
+          </button>
+        </div>
+        <div id="importLogs" class="import-logs"></div>
       </div>
     </div>
 
