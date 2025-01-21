@@ -146,6 +146,127 @@
         padding: 5px 0;
         border-bottom: 1px solid #eee;
       }
+
+      .product-filter {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+
+      .search-card {
+        background-color: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      .search-card h4 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 16px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+      }
+
+      .search-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .product-list-card {
+        background-color: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+      }
+
+      .product-list-card h4 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 16px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+      }
+
+      .form-group select,
+      .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .form-group select:focus,
+      .form-group input:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+      }
+
+      .product-select-modal {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        max-width: 80%;
+        width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+
+      .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+      }
+
+      .product-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .product-item:hover {
+        background-color: #f5f5f5;
+      }
+
+      .delete-btn {
+        color: #dc3545;
+        cursor: pointer;
+        padding: 5px 10px;
+        border: none;
+        background: none;
+      }
+
+      .delete-btn:hover {
+        color: #bd2130;
+      }
+
+      .import-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        margin-top: 20px;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
   </head>
@@ -164,19 +285,68 @@
           <label>报损日期</label>
           <input type="date" id="lossDate" required />
         </div>
-        <table class="loss-table">
-          <thead>
-            <tr>
-              <th>商品名称</th>
-              <th>类别</th>
-              <th>报损数量</th>
-              <th>报损原因</th>
-            </tr>
-          </thead>
-          <tbody id="lossProductList">
-            <!-- 将通过 JavaScript 动态填充 -->
-          </tbody>
-        </table>
+
+        <!-- 搜索区域 -->
+        <div class="search-grid">
+          <!-- 商品类别卡片 -->
+          <div class="search-card">
+            <h4>商品类别</h4>
+            <div class="form-group">
+              <select id="categoryFilter" onchange="filterProducts()">
+                <option value="主食类" selected>主食类</option>
+                <option value="小吃类">小吃类</option>
+                <option value="饮品类">饮品类</option>
+                <option value="烘焙类">烘焙类</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 价格区间卡片 -->
+          <div class="search-card">
+            <h4>价格区间</h4>
+            <div class="form-group">
+              <select id="priceRange" onchange="filterProducts()">
+                <option value="0-10">10元以下</option>
+                <option value="10-20">10-20元</option>
+                <option value="20-30">20-30元</option>
+                <option value="30-up">30元以上</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 商品搜索卡片 -->
+          <div class="search-card">
+            <h4>商品名称</h4>
+            <div class="form-group">
+              <input
+                type="text"
+                id="searchInput"
+                placeholder="输入商品名称搜索..."
+                oninput="filterProducts()"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 商品列表卡片 -->
+        <div class="product-list-card">
+          <h4>商品列表</h4>
+          <table class="loss-table">
+            <thead>
+              <tr>
+                <th>商品名称</th>
+                <th>类别</th>
+                <th>价格</th>
+                <th>报损数量</th>
+                <th>报损原因</th>
+              </tr>
+            </thead>
+            <tbody id="lossProductList">
+              <!-- 将通过 JavaScript 动态填充已选商品 -->
+            </tbody>
+          </table>
+        </div>
+
         <button
           class="btn btn-primary"
           onclick="submitLossRecord()"
@@ -192,6 +362,32 @@
         <div id="lossHistoryList">
           <!-- 将通过 JavaScript 动态填充 -->
         </div>
+      </div>
+
+      <!-- 导入盘点数据卡片 -->
+      <div class="import-card">
+        <h3 class="section-title">导入盘点数据</h3>
+        <div class="form-group">
+          <label>选择盘点数据文件</label>
+          <input type="file" id="inventoryFile" accept=".json" />
+        </div>
+        <button
+          class="btn btn-primary"
+          onclick="importInventoryData()"
+          style="margin-top: 10px"
+        >
+          导入数据
+        </button>
+        <div id="importStatus" style="margin-top: 10px; color: #666"></div>
+      </div>
+    </div>
+
+    <!-- 添加商品选择模态框 -->
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="product-select-modal" id="productSelectModal">
+      <h3>选择商品</h3>
+      <div id="productList" class="product-list">
+        <!-- 将通过 JavaScript 动态填充可选商品列表 -->
       </div>
     </div>
 
@@ -209,41 +405,153 @@
         document.getElementById("lossDate").value = today;
       }
 
+      // 商品筛选和选择相关的变量
+      let allProducts = [];
+      let selectedProducts = new Set();
+
       // 加载商品列表
       async function loadProductList() {
         try {
+          console.log("开始加载商品列表...");
           const query = new AV.Query("Product");
+          query.limit(1000); // 确保获取所有商品
+          query.ascending("name"); // 按名称排序
           const products = await query.find();
+          console.log("获取到商品数量:", products.length);
 
-          const listElement = document.getElementById("lossProductList");
-          listElement.innerHTML = products
-            .map((product) => {
-              const name = product.get("name");
-              const category =
-                product.get("category") === "drinks" ? "饮品" : "烘焙";
+          if (products.length === 0) {
+            console.log("警告: 数据库中没有商品");
+            return;
+          }
 
-              return `
-              <tr data-id="${product.id}">
-                <td>${name}</td>
-                <td>${category}</td>
-                <td><input type="number" min="0" class="loss-count" /></td>
-                <td>
-                  <select class="loss-reason">
-                    <option value="">选择原因...</option>
-                    <option value="过期">过期</option>
-                    <option value="破损">破损</option>
-                    <option value="质量问题">质量问题</option>
-                    <option value="其他">其他</option>
-                  </select>
-                </td>
-              </tr>
-            `;
-            })
-            .join("");
+          allProducts = products;
+          console.log("商品类别统计:");
+          const categories = {};
+          products.forEach((p) => {
+            const category = p.get("category");
+            categories[category] = (categories[category] || 0) + 1;
+          });
+          console.log(categories);
+
+          filterProducts();
         } catch (error) {
           console.error("加载商品列表失败:", error);
+          console.error("错误详情:", error.message);
           alert("加载商品列表失败，请重试");
         }
+      }
+
+      // 筛选商品
+      function filterProducts() {
+        console.log("开始筛选商品...");
+        console.log("当前商品总数:", allProducts.length);
+
+        const category = document.getElementById("categoryFilter").value;
+        const searchText = document
+          .getElementById("searchInput")
+          .value.toLowerCase()
+          .trim();
+        const priceRange = document.getElementById("priceRange").value;
+
+        console.log("筛选条件:", {
+          category,
+          searchText,
+          priceRange,
+        });
+
+        // 解析价格范围
+        let [minPrice, maxPrice] = priceRange
+          .split("-")
+          .map((p) => (p === "up" ? Infinity : Number(p)));
+
+        // 如果有搜索文本，优先按名称搜索
+        let filteredProducts;
+        if (searchText) {
+          filteredProducts = allProducts.filter((product) => {
+            const name = product.get("name").toLowerCase();
+            return name.includes(searchText);
+          });
+        } else {
+          // 如果没有搜索文本，则按类别和价格筛选
+          filteredProducts = allProducts.filter((product) => {
+            const productCategory = product.get("category");
+            const price = product.get("price") || 0;
+
+            return (
+              productCategory === category &&
+              price >= minPrice &&
+              (maxPrice === Infinity ? true : price < maxPrice)
+            );
+          });
+        }
+
+        console.log("筛选后商品数量:", filteredProducts.length);
+        displayFilteredProducts(filteredProducts);
+      }
+
+      // 显示筛选后的商品列表
+      function displayFilteredProducts(products) {
+        console.log("开始显示商品列表...");
+        const lossProductList = document.getElementById("lossProductList");
+
+        if (!products || products.length === 0) {
+          console.log("没有找到商品");
+          lossProductList.innerHTML =
+            '<tr><td colspan="5" style="text-align: center;">没有找到符合条件的商品</td></tr>';
+          return;
+        }
+
+        const productsHtml = products
+          .map((product) => {
+            const name = product.get("name");
+            const category = product.get("category");
+            const price = product.get("price") || 0;
+
+            return `
+            <tr data-id="${product.id}">
+              <td>${name}</td>
+              <td>${category}</td>
+              <td>${price}元</td>
+              <td><input type="number" min="0" class="loss-count" /></td>
+              <td>
+                <select class="loss-reason">
+                  <option value="">选择原因...</option>
+                  <option value="过期">过期</option>
+                  <option value="破损">破损</option>
+                  <option value="质量问题">质量问题</option>
+                  <option value="其他">其他</option>
+                </select>
+              </td>
+            </tr>
+          `;
+          })
+          .join("");
+
+        console.log("渲染商品数量:", products.length);
+        lossProductList.innerHTML = productsHtml;
+      }
+
+      // 移除已选商品
+      function removeProduct(productId) {
+        selectedProducts.delete(productId);
+        filterProducts(); // 重新加载商品列表
+      }
+
+      // 显示商品选择模态框
+      function showProductModal() {
+        document.getElementById("modalBackdrop").style.display = "block";
+        document.getElementById("productSelectModal").style.display = "block";
+      }
+
+      // 隐藏商品选择模态框
+      function hideProductModal() {
+        document.getElementById("modalBackdrop").style.display = "none";
+        document.getElementById("productSelectModal").style.display = "none";
+      }
+
+      // 添加选中的商品
+      function addSelectedProduct() {
+        showProductModal();
       }
 
       // 加载报损历史
@@ -295,7 +603,7 @@
         }
       }
 
-      // 提交报损记录
+      // 修改提交报损记录函数
       async function submitLossRecord() {
         try {
           const currentUser = AV.User.current();
@@ -309,12 +617,12 @@
           const items = [];
           let hasLoss = false;
 
-          // 收集表单数据
           document.querySelectorAll("#lossProductList tr").forEach((row) => {
             const productId = row.dataset.id;
             const quantity =
               parseInt(row.querySelector(".loss-count").value) || 0;
             const reason = row.querySelector(".loss-reason").value;
+            const productName = row.querySelector("td").textContent;
 
             if (quantity > 0) {
               if (!reason) {
@@ -322,10 +630,14 @@
               }
               hasLoss = true;
               items.push({
-                product: productId,
+                product: {
+                  __type: "Pointer",
+                  className: "Product",
+                  objectId: productId,
+                },
                 quantity: quantity,
                 reason: reason,
-                productName: row.querySelector("td").textContent,
+                productName: productName,
               });
             }
           });
@@ -335,7 +647,10 @@
             return;
           }
 
-          // 创建报损记录
+          if (!confirm("确认提交报损记录吗？")) {
+            return;
+          }
+
           const ProductLoss = AV.Object.extend("ProductLoss");
           const loss = new ProductLoss();
 
@@ -344,7 +659,7 @@
           loss.set("operator", currentUser);
 
           await loss.save();
-          // 提交成功后直接返回工作台
+          alert("报损记录提交成功！");
           window.location.href = "dashboard.html";
         } catch (error) {
           console.error("提交报损记录失败:", error);
@@ -364,11 +679,84 @@
         }
       }
 
+      // 导入盘点数据
+      async function importInventoryData() {
+        const fileInput = document.getElementById("inventoryFile");
+        const statusDiv = document.getElementById("importStatus");
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+          alert("请选择要导入的文件");
+          return;
+        }
+
+        const file = fileInput.files[0];
+        statusDiv.textContent = "正在读取文件...";
+
+        try {
+          const reader = new FileReader();
+          reader.onload = async function (e) {
+            try {
+              const data = JSON.parse(e.target.result);
+              statusDiv.textContent = "正在处理数据...";
+
+              // 验证数据格式
+              if (!Array.isArray(data)) {
+                throw new Error("数据格式不正确，请确保是JSON数组格式");
+              }
+
+              // 处理每条盘点记录
+              for (const item of data) {
+                if (!item.productName || !item.quantity) {
+                  throw new Error("数据缺少必要字段：商品名称或数量");
+                }
+
+                // 查找对应的商品
+                const query = new AV.Query("Product");
+                query.equalTo("name", item.productName);
+                const product = await query.first();
+
+                if (!product) {
+                  console.warn(`未找到商品: ${item.productName}`);
+                  continue;
+                }
+
+                // 自动填充到报损表格中
+                const rows = document.querySelectorAll("#lossProductList tr");
+                for (const row of rows) {
+                  const nameCell = row.querySelector("td");
+                  if (nameCell && nameCell.textContent === item.productName) {
+                    const quantityInput = row.querySelector(".loss-count");
+                    if (quantityInput) {
+                      quantityInput.value = item.quantity;
+                    }
+                    break;
+                  }
+                }
+              }
+
+              statusDiv.textContent = "数据导入成功！";
+              fileInput.value = ""; // 清空文件选择
+            } catch (error) {
+              console.error("处理数据失败:", error);
+              statusDiv.textContent = `导入失败: ${error.message}`;
+            }
+          };
+
+          reader.readAsText(file);
+        } catch (error) {
+          console.error("读取文件失败:", error);
+          statusDiv.textContent = "读取文件失败，请重试";
+        }
+      }
+
       // 页面加载时执行
       window.onload = function () {
         setDefaultDate();
-        loadProductList();
+        loadProductList(); // 这会自动调用 filterProducts
         loadLossHistory();
+
+        // 添加模态框关闭事件
+        document.getElementById("modalBackdrop").onclick = hideProductModal;
       };
     </script>
   </body>

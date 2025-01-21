@@ -148,6 +148,133 @@
       th:hover {
         background-color: #f0f0f0;
       }
+
+      .import-logs {
+        max-height: 400px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: monospace;
+        white-space: pre-wrap;
+      }
+      .log-entry {
+        margin: 2px 0;
+        padding: 2px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .log-stats {
+        color: #0066cc;
+        font-weight: bold;
+      }
+      .log-warning {
+        color: #cc6600;
+      }
+      .log-error {
+        color: #cc0000;
+      }
+
+      .card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .card h4 {
+        margin-bottom: 15px;
+        color: #333;
+        font-size: 18px;
+      }
+
+      .button-group {
+        margin: 15px 0;
+        display: flex;
+        gap: 10px;
+      }
+
+      .import-logs {
+        margin-top: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-success {
+        background-color: #28a745;
+        color: white;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+
+      .log-item {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        background: #f8f9fa;
+        border-left: 4px solid #ddd;
+      }
+
+      .log-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+        font-size: 12px;
+        color: #666;
+      }
+
+      .log-content {
+        font-size: 14px;
+        color: #333;
+      }
+
+      .log-type {
+        font-weight: bold;
+      }
+
+      .log-fix {
+        border-left-color: #007bff;
+      }
+
+      .log-extract {
+        border-left-color: #28a745;
+      }
+
+      .log-inventory {
+        border-left-color: #fd7e14;
+      }
+
+      .log-time {
+        color: #888;
+      }
+
+      .log-operator {
+        color: #666;
+        font-weight: bold;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
   </head>
@@ -172,6 +299,34 @@
           <div id="progressText" style="text-align: center; margin-top: 10px">
             准备开始...
           </div>
+        </div>
+
+        <!-- 添加导入卡片 -->
+        <div class="card" style="margin-top: 20px">
+          <h4>导入盘点数据</h4>
+          <div class="form-group">
+            <input
+              type="file"
+              id="inventoryFile"
+              accept=".xlsx,.xls"
+              class="form-control"
+              style="margin-bottom: 10px"
+            />
+          </div>
+          <div class="button-group">
+            <button onclick="importInventoryData()" class="btn btn-primary">
+              分析文件
+            </button>
+            <button
+              id="uploadButton"
+              onclick="uploadInventoryData()"
+              class="btn btn-success"
+              style="display: none"
+            >
+              上传到数据库
+            </button>
+          </div>
+          <div id="importLogs" class="import-logs"></div>
         </div>
 
         <div style="display: flex; gap: 10px; margin-bottom: 20px">
@@ -277,6 +432,7 @@
         </div>
       </div>
 
+      <!-- 商品管理卡片 -->
       <div class="card">
         <h2>商品管理</h2>
         <div style="margin-bottom: 20px">
@@ -1447,6 +1603,392 @@
           addSalesLog("\n商品数据更新完成！", "success");
         } catch (error) {
           addSalesLog(`更新商品数据失败: ${error.message}`, "error");
+        }
+      }
+
+      // 添加盘点日志
+      function addInventoryLog(message, type = "info") {
+        const logsDiv = document.getElementById("importLogs");
+        const logEntry = document.createElement("div");
+        logEntry.className = `log-entry log-${type}`;
+        logEntry.textContent = message;
+        logsDiv.appendChild(logEntry);
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+      }
+
+      // 更新盘点进度
+      function updateInventoryProgress(current, total) {
+        const progress = (current / total) * 100;
+        const progressBar = document.getElementById("importProgress");
+        progressBar.style.width = `${progress}%`;
+        progressBar.textContent = `${Math.round(progress)}%`;
+      }
+
+      let analyzedData = null; // 存储分析后的数据
+
+      async function importInventoryData() {
+        try {
+          const file = document.getElementById("inventoryFile").files[0];
+          if (!file) {
+            addInventoryLog("请选择要导入的文件", "error");
+            return;
+          }
+
+          addInventoryLog("开始读取文件...", "info");
+          const workbook = XLSX.read(await file.arrayBuffer());
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(worksheet);
+
+          // 按日期和店铺分组数据
+          const groupedData = new Map();
+          const stats = {
+            totalRecords: 0,
+            stores: new Set(),
+            types: new Map(),
+            storeTypes: new Map(),
+          };
+
+          for (const row of data) {
+            const dateStr = row["日期"];
+            const storeName = row["店铺名"];
+            const product = row["产品"];
+            const quantity = row["数量"];
+            let type = row["盘点类型"];
+
+            if (
+              !dateStr ||
+              !storeName ||
+              !product ||
+              quantity === undefined ||
+              !type
+            ) {
+              addInventoryLog(
+                `跳过无效数据行: ${JSON.stringify(row)}`,
+                "warning"
+              );
+              continue;
+            }
+
+            // 标准化操作类型
+            type = normalizeInventoryType(type);
+            if (!type) {
+              addInventoryLog(`未知的盘点类型: ${row["盘点类型"]}`, "warning");
+              continue;
+            }
+
+            // 将日期字符串转换为 Date 对象
+            const [year, month, day] = dateStr.split("-").map(Number);
+            const date = new Date(year, month - 1, day);
+            date.setHours(0, 0, 0, 0);
+
+            const key = `${dateStr}_${storeName}_${type}`;
+            if (!groupedData.has(key)) {
+              groupedData.set(key, {
+                date,
+                storeName,
+                type,
+                items: [],
+              });
+
+              // 更新统计信息
+              stats.totalRecords++;
+              stats.stores.add(storeName);
+              stats.types.set(type, (stats.types.get(type) || 0) + 1);
+
+              if (!stats.storeTypes.has(storeName)) {
+                stats.storeTypes.set(storeName, new Set());
+              }
+              stats.storeTypes.get(storeName).add(type);
+            }
+            groupedData
+              .get(key)
+              .items.push({ product, quantity: Number(quantity) });
+          }
+
+          // 显示统计信息
+          addInventoryLog("\n=== 数据分析结果 ===", "stats");
+          addInventoryLog(`总盘点记录数: ${stats.totalRecords}`, "stats");
+          addInventoryLog(`涉及店铺数: ${stats.stores.size}`, "stats");
+          addInventoryLog("\n按盘点类型统计:", "stats");
+          stats.types.forEach((count, type) => {
+            addInventoryLog(`${getTypeText(type)}: ${count}条`, "stats");
+          });
+
+          addInventoryLog("\n各店铺盘点类型:", "stats");
+          stats.stores.forEach((store) => {
+            const types = Array.from(stats.storeTypes.get(store))
+              .map((type) => getTypeText(type))
+              .join(", ");
+            addInventoryLog(`${store}: ${types}`, "stats");
+          });
+
+          // 检查重复记录
+          addInventoryLog("\n开始检查重复记录...", "info");
+          const duplicates = [];
+          for (const [key, record] of groupedData.entries()) {
+            const query = new AV.Query("InventoryCheck");
+
+            // 使用日期字符串进行精确匹配
+            const dateStr = record.date.toISOString().split("T")[0];
+            addInventoryLog(
+              `检查记录: ${dateStr} ${record.storeName} ${getTypeText(
+                record.type
+              )}`,
+              "info"
+            );
+
+            // 获取所有记录以便在日志中显示
+            query.equalTo("storeName", record.storeName);
+            query.equalTo("type", record.type);
+            const allRecords = await query.find();
+
+            // 检查每条记录的日期
+            const isDuplicate = allRecords.some((existingRecord) => {
+              const existingDateStr = existingRecord
+                .get("date")
+                .toISOString()
+                .split("T")[0];
+              const isMatch = existingDateStr === dateStr;
+              if (isMatch) {
+                addInventoryLog(
+                  `找到匹配记录: ${existingDateStr} ${existingRecord.get(
+                    "storeName"
+                  )} ${getTypeText(existingRecord.get("type"))}`,
+                  "warning"
+                );
+              }
+              return isMatch;
+            });
+
+            if (isDuplicate) {
+              duplicates.push({
+                date: dateStr,
+                store: record.storeName,
+                type: getTypeText(record.type),
+              });
+            }
+          }
+
+          if (duplicates.length > 0) {
+            addInventoryLog("\n发现重复记录:", "warning");
+            duplicates.forEach((dup) => {
+              addInventoryLog(
+                `${dup.date} ${dup.store} ${dup.type}`,
+                "warning"
+              );
+            });
+          } else {
+            addInventoryLog("未发现重复记录", "success");
+          }
+
+          // 保存分析结果供上传使用
+          analyzedData = {
+            groupedData,
+            duplicates,
+          };
+
+          // 显示上传按钮
+          document.getElementById("uploadButton").style.display =
+            "inline-block";
+        } catch (error) {
+          console.error("分析失败:", error);
+          addInventoryLog(`分析失败: ${error.message}`, "error");
+        }
+      }
+
+      async function uploadInventoryData() {
+        if (!analyzedData) {
+          addInventoryLog("请先分析数据文件", "error");
+          return;
+        }
+
+        try {
+          addInventoryLog("\n=== 开始上传数据 ===", "info");
+          const { groupedData, duplicates } = analyzedData;
+
+          // 创建一个Set来存储重复记录的key
+          const duplicateKeys = new Set(
+            duplicates.map(
+              (dup) => `${dup.date}_${dup.store}_${getTypeText(dup.type)}`
+            )
+          );
+
+          let uploadedCount = 0;
+          let skippedCount = 0;
+
+          for (const [key, record] of groupedData.entries()) {
+            const recordKey = `${record.date.toISOString().split("T")[0]}_${
+              record.storeName
+            }_${getTypeText(record.type)}`;
+
+            // 如果是重复记录，跳过
+            if (duplicateKeys.has(recordKey)) {
+              addInventoryLog(
+                `跳过重复记录: ${record.date.toISOString().split("T")[0]} ${
+                  record.storeName
+                } ${getTypeText(record.type)}`,
+                "warning"
+              );
+              skippedCount++;
+              continue;
+            }
+
+            // 创建新记录
+            const InventoryCheck = AV.Object.extend("InventoryCheck");
+            const inventoryCheck = new InventoryCheck();
+            inventoryCheck.set("date", record.date);
+            inventoryCheck.set("storeName", record.storeName);
+            inventoryCheck.set("type", record.type);
+            inventoryCheck.set("items", record.items);
+            inventoryCheck.set("status", "submitted");
+            inventoryCheck.set("operator", AV.User.current());
+
+            await inventoryCheck.save();
+            uploadedCount++;
+
+            // 创建系统日志
+            const SystemLog = AV.Object.extend("SystemLog");
+            const log = new SystemLog();
+            log.set("type", `inventory_${record.type}`);
+            log.set("operator", AV.User.current());
+            log.set(
+              "content",
+              `${record.storeName} ${
+                record.date.toISOString().split("T")[0]
+              } ${getTypeText(record.type)}`
+            );
+            log.set("date", record.date);
+            await log.save();
+
+            addInventoryLog(
+              `成功上传: ${record.date.toISOString().split("T")[0]} ${
+                record.storeName
+              } ${getTypeText(record.type)}`,
+              "success"
+            );
+          }
+
+          addInventoryLog(
+            `\n上传完成: 成功上传 ${uploadedCount} 条记录，跳过 ${skippedCount} 条重复记录`,
+            "success"
+          );
+
+          // 清除分析数据
+          analyzedData = null;
+          // 隐藏上传按钮
+          document.getElementById("uploadButton").style.display = "none";
+        } catch (error) {
+          console.error("上传失败:", error);
+          addInventoryLog(`上传失败: ${error.message}`, "error");
+        }
+      }
+
+      // 标准化盘点类型
+      function normalizeInventoryType(type) {
+        switch (type.trim()) {
+          case "开店":
+          case "开店盘点":
+            return "opening";
+          case "闭店":
+          case "闭店盘点":
+            return "closing";
+          case "进货":
+          case "进货盘点":
+            return "restocking";
+          case "报损":
+          case "报损盘点":
+            return "loss";
+          default:
+            return null;
+        }
+      }
+
+      // 辅助函数：获取盘点类型的中文显示
+      function getTypeText(type) {
+        switch (type) {
+          case "opening":
+            return "开店盘点";
+          case "closing":
+            return "闭店盘点";
+          case "restocking":
+            return "进货盘点";
+          case "loss":
+            return "报损盘点";
+          default:
+            return type;
+        }
+      }
+
+      // 加载系统日志
+      async function loadSystemLogs() {
+        try {
+          const query = new AV.Query("SystemLog");
+          query.descending("createdAt");
+          query.limit(1000);
+
+          // 添加盘点相关的类型
+          query.containedIn("type", [
+            "store_name_fix",
+            "product_extract",
+            "inventory_opening",
+            "inventory_closing",
+            "inventory_restocking",
+            "inventory_loss",
+          ]);
+
+          const logs = await query.find();
+          const logsDiv = document.getElementById("systemLogs");
+          logsDiv.innerHTML = logs
+            .map((log) => {
+              const time = new Date(log.createdAt).toLocaleString();
+              const operator = log.get("operator").get("username");
+              const content = log.get("content");
+              const type = log.get("type");
+
+              // 根据日志类型设置不同的样式
+              let typeText = "";
+              let typeClass = "";
+              switch (type) {
+                case "store_name_fix":
+                  typeText = "修复店铺名称";
+                  typeClass = "log-fix";
+                  break;
+                case "product_extract":
+                  typeText = "提取商品";
+                  typeClass = "log-extract";
+                  break;
+                case "inventory_opening":
+                  typeText = "开店盘点";
+                  typeClass = "log-inventory";
+                  break;
+                case "inventory_closing":
+                  typeText = "闭店盘点";
+                  typeClass = "log-inventory";
+                  break;
+                case "inventory_restocking":
+                  typeText = "进货盘点";
+                  typeClass = "log-inventory";
+                  break;
+                case "inventory_loss":
+                  typeText = "报损记录";
+                  typeClass = "log-inventory";
+                  break;
+              }
+
+              return `
+                <div class="log-item ${typeClass}">
+                  <div class="log-header">
+                    <span class="log-time">${time}</span>
+                    <span class="log-operator">${operator}</span>
+                    <span class="log-type">${typeText}</span>
+                  </div>
+                  <div class="log-content">${content}</div>
+                </div>
+              `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载系统日志失败:", error);
         }
       }
     </script>

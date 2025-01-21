@@ -424,23 +424,21 @@
       <!-- 系统日志 -->
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">系统日志</h2>
+          <h2 class="card-title">历史盘点记录</h2>
           <div class="filters">
-            <div class="date-range">
-              <input
-                type="date"
-                id="startDate"
-                class="date-input"
-                onchange="filterLogs()"
-              />
-              <span class="date-separator">至</span>
-              <input
-                type="date"
-                id="endDate"
-                class="date-input"
-                onchange="filterLogs()"
-              />
-            </div>
+            <select
+              id="storeFilter"
+              class="filter-select"
+              onchange="filterLogs()"
+            >
+              <option value="all">所有店铺</option>
+            </select>
+            <input
+              type="date"
+              id="dateFilter"
+              class="filter-select"
+              onchange="filterLogs()"
+            />
           </div>
         </div>
         <div class="table-container">
@@ -466,7 +464,10 @@
             <thead>
               <tr>
                 <th onclick="sortLogs('time')" class="sortable">
-                  时间 <span class="sort-icon">↓</span>
+                  上传时间 <span class="sort-icon">↓</span>
+                </th>
+                <th onclick="sortLogs('date')" class="sortable">
+                  盘点日期 <span class="sort-icon"></span>
                 </th>
                 <th onclick="sortLogs('type')" class="sortable">
                   操作类型 <span class="sort-icon"></span>
@@ -980,14 +981,18 @@
 
       // 修改 filterLogs 函数
       function filterLogs() {
-        const startDate = new Date(document.getElementById("startDate").value);
-        const endDate = new Date(document.getElementById("endDate").value);
-        endDate.setHours(23, 59, 59, 999); // 设置为当天结束时间
+        const selectedStore = document.getElementById("storeFilter").value;
+        const selectedDate = document.getElementById("dateFilter").value;
 
         // 基于原始数据进行过滤
         currentLogs = originalLogs.filter((log) => {
-          const logDate = new Date(log.createdAt);
-          return logDate >= startDate && logDate <= endDate;
+          const matchesStore =
+            selectedStore === "all" || log.get("storeName") === selectedStore;
+
+          if (!selectedDate) return matchesStore;
+
+          const logDate = new Date(log.get("date")).toISOString().split("T")[0];
+          return matchesStore && logDate === selectedDate;
         });
 
         // 更新统计数据
@@ -1271,17 +1276,23 @@
           await checkAdmin();
           console.log("管理员验证通过");
 
+          // 设置日期选择器的默认值为今天
+          const today = new Date().toISOString().split("T")[0];
+          document.getElementById("dateFilter").value = today;
+
           // 并行加载数据以提高性能
           await Promise.all([
             loadUsers().catch((e) => console.error("加载用户列表失败:", e)),
             loadStores().catch((e) => console.error("加载店铺列表失败:", e)),
+            loadStoreOptions().catch((e) =>
+              console.error("加载店铺选项失败:", e)
+            ),
             loadLogs().catch((e) => console.error("加载日志失败:", e)),
             loadTodaySalesStats().catch((e) =>
               console.error("加载今日销售统计失败:", e)
             ),
           ]);
 
-          setDefaultDateRange();
           filterLogs();
         } catch (error) {
           console.error("页面加载失败:", error);
@@ -1351,22 +1362,29 @@
         document.getElementById("userModal").style.display = "none";
       }
 
-      // 修改 setDefaultDateRange 函数
-      function setDefaultDateRange() {
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 3); // 改为3天前（原来是30天）
+      // 添加加载店铺选项的函数
+      async function loadStoreOptions() {
+        try {
+          const query = new AV.Query("Store");
+          const stores = await query.find();
+          const storeFilter = document.getElementById("storeFilter");
 
-        // 格式化日期为 YYYY-MM-DD 格式
-        document.getElementById("endDate").value = endDate
-          .toISOString()
-          .split("T")[0];
-        document.getElementById("startDate").value = startDate
-          .toISOString()
-          .split("T")[0];
+          // 获取所有唯一的店铺名称
+          const storeNames = new Set();
+          stores.forEach((store) => {
+            storeNames.add(store.get("name"));
+          });
 
-        // 立即触发过滤
-        filterLogs();
+          // 添加店铺选项
+          storeNames.forEach((storeName) => {
+            const option = document.createElement("option");
+            option.value = storeName;
+            option.textContent = storeName.replace("食圈儿 ", "");
+            storeFilter.appendChild(option);
+          });
+        } catch (error) {
+          console.error("加载店铺选项失败:", error);
+        }
       }
 
       // 添加 updateStatistics 函数
@@ -1394,13 +1412,13 @@
           stats.restocking;
       }
 
-      // 添加 renderLogs 函数（如果还没有的话）
+      // 添加 renderLogs 函数
       function renderLogs() {
         const logsList = document.getElementById("logsList");
         if (!currentLogs || currentLogs.length === 0) {
           logsList.innerHTML = `
             <tr>
-              <td colspan="6" style="text-align: center;">暂无盘点记录</td>
+              <td colspan="7" style="text-align: center;">暂无盘点记录</td>
             </tr>
           `;
           return;
@@ -1409,6 +1427,13 @@
         logsList.innerHTML = currentLogs
           .map((log) => {
             const time = new Date(log.createdAt).toLocaleString();
+            const inventoryDate = new Date(log.get("date"));
+            const timezoneOffset = inventoryDate.getTimezoneOffset() * 60000;
+            const localDate = new Date(
+              inventoryDate.getTime() + timezoneOffset
+            );
+            const date = localDate.toLocaleDateString();
+
             const operator = log.get("operator");
             const operatorName = operator
               ? operator.get("name") || operator.get("username")
@@ -1428,6 +1453,9 @@
               case "restocking":
                 typeText = "进货盘点";
                 break;
+              case "loss":
+                typeText = "报损盘点";
+                break;
               default:
                 typeText = type || "未知类型";
             }
@@ -1435,6 +1463,7 @@
             return `
               <tr data-type="${type}">
                 <td>${time}</td>
+                <td>${date}</td>
                 <td>${typeText}</td>
                 <td>${operatorName}</td>
                 <td>${displayStoreName}</td>
@@ -1485,6 +1514,10 @@
               valueA = new Date(a.createdAt).getTime();
               valueB = new Date(b.createdAt).getTime();
               break;
+            case "date":
+              valueA = new Date(a.get("date")).getTime();
+              valueB = new Date(b.get("date")).getTime();
+              break;
             case "type":
               valueA = getTypeText(a.get("type"));
               valueB = getTypeText(b.get("type"));
@@ -1528,6 +1561,8 @@
             return "闭店盘点";
           case "restocking":
             return "进货盘点";
+          case "loss":
+            return "报损盘点";
           default:
             return type || "未知类型";
         }
@@ -1556,6 +1591,104 @@
           document.getElementById("todaySalesCount").textContent = "加载失败";
         }
       }
+
+      // 加载系统日志
+      async function loadSystemLogs() {
+        try {
+          const dateInput = document.getElementById("logDate");
+          const selectedDate = dateInput
+            ? new Date(dateInput.value)
+            : new Date();
+
+          // 将日期转换为字符串格式 YYYY-MM-DD
+          const dateStr = selectedDate.toISOString().split("T")[0];
+
+          const query = new AV.Query("SystemLog");
+          query.equalTo("date", dateStr); // 使用精确日期匹配
+          query.descending("createdAt");
+          query.include("operator");
+          query.include("relatedObject");
+
+          // 添加盘点相关的类型
+          query.containedIn("type", [
+            "store_name_fix",
+            "product_extract",
+            "inventory_opening",
+            "inventory_closing",
+            "inventory_restocking",
+            "inventory_loss",
+          ]);
+
+          const logs = await query.find();
+          const logsDiv = document.getElementById("systemLogs");
+
+          if (logs.length === 0) {
+            logsDiv.innerHTML =
+              '<div class="no-logs">当天没有系统日志记录</div>';
+            return;
+          }
+
+          logsDiv.innerHTML = logs
+            .map((log) => {
+              const time = new Date(log.createdAt).toLocaleString();
+              const operator = log.get("operator").get("username");
+              const content = log.get("content");
+              const type = log.get("type");
+
+              // 根据日志类型设置不同的样式和文本
+              let typeText = "";
+              let typeClass = "";
+              switch (type) {
+                case "store_name_fix":
+                  typeText = "修复店铺名称";
+                  typeClass = "log-fix";
+                  break;
+                case "product_extract":
+                  typeText = "提取商品";
+                  typeClass = "log-extract";
+                  break;
+                case "inventory_opening":
+                  typeText = "开店盘点";
+                  typeClass = "log-inventory";
+                  break;
+                case "inventory_closing":
+                  typeText = "闭店盘点";
+                  typeClass = "log-inventory";
+                  break;
+                case "inventory_restocking":
+                  typeText = "进货盘点";
+                  typeClass = "log-inventory";
+                  break;
+                case "inventory_loss":
+                  typeText = "报损记录";
+                  typeClass = "log-inventory";
+                  break;
+              }
+
+              return `
+              <div class="log-item ${typeClass}">
+                <div class="log-header">
+                  <span class="log-time">${time}</span>
+                  <span class="log-operator">${operator}</span>
+                  <span class="log-type">${typeText}</span>
+                </div>
+                <div class="log-content">${content}</div>
+              </div>
+            `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("加载系统日志失败:", error);
+          const logsDiv = document.getElementById("systemLogs");
+          logsDiv.innerHTML =
+            '<div class="error-message">加载系统日志失败，请重试</div>';
+        }
+      }
+
+      // 添加日期选择的事件监听
+      document
+        .getElementById("logDate")
+        .addEventListener("change", loadSystemLogs);
     </script>
   </body>
 </html>
