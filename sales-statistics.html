@@ -195,6 +195,9 @@
           <button class="btn btn-primary" onclick="saveProductsToDatabase()">
             保存商品到数据库
           </button>
+          <button class="btn btn-success" onclick="updateSalesData()">
+            更新销售数据
+          </button>
         </div>
       </div>
 
@@ -509,6 +512,132 @@
         } catch (error) {
           console.error("保存商品失败:", error);
           alert("保存商品失败: " + error.message);
+        }
+      }
+
+      // 添加新函数
+      async function updateSalesData() {
+        try {
+          const date = document.getElementById("salesDate").value;
+          const storeId = document.getElementById("storeSelect").value;
+
+          if (!date || !storeId) {
+            alert("请选择日期和店铺");
+            return;
+          }
+
+          // 获取当天的开店和闭店盘点记录
+          const storeData = JSON.parse(
+            localStorage.getItem("selectedStore") || "{}"
+          );
+          const selectedDate = new Date(date);
+          selectedDate.setHours(0, 0, 0, 0);
+          const nextDay = new Date(selectedDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+
+          const InventoryCheck = AV.Object.extend("InventoryCheck");
+          const query = new AV.Query(InventoryCheck);
+          query.equalTo("storeId", storeData.id);
+          query.greaterThanOrEqualTo("date", selectedDate);
+          query.lessThan("date", nextDay);
+          const inventoryChecks = await query.find();
+
+          // 分类盘点记录
+          const openingCheck = inventoryChecks.find(
+            (check) => check.get("type") === "opening"
+          );
+          const closingCheck = inventoryChecks.find(
+            (check) => check.get("type") === "closing"
+          );
+          const restockingChecks = inventoryChecks.filter(
+            (check) => check.get("type") === "restocking"
+          );
+
+          if (!openingCheck || !closingCheck) {
+            alert("找不到当天的开店或闭店盘点记录");
+            return;
+          }
+
+          // 计算销售数据
+          const openingItems = openingCheck.get("items");
+          const closingItems = closingCheck.get("items");
+          const salesData = [];
+
+          // 获取所有商品信息
+          const Product = AV.Object.extend("Product");
+          const productQuery = new AV.Query(Product);
+          const products = await productQuery.find();
+          const productMap = new Map(products.map((p) => [p.id, p]));
+
+          // 处理每个商品
+          for (const openingItem of openingItems) {
+            const productId = openingItem.product.objectId;
+            const product = productMap.get(productId);
+            if (!product) continue;
+
+            const closingItem = closingItems.find(
+              (item) => item.product.objectId === productId
+            );
+            if (!closingItem) continue;
+
+            // 计算进货数量
+            let restockQuantity = 0;
+            restockingChecks.forEach((check) => {
+              const restockItem = check
+                .get("items")
+                .find((item) => item.product.objectId === productId);
+              if (restockItem) {
+                restockQuantity += restockItem.quantity;
+              }
+            });
+
+            // 计算销售数量：开店库存 + 进货数量 - 闭店库存
+            const salesQuantity =
+              openingItem.quantity + restockQuantity - closingItem.quantity;
+            if (salesQuantity > 0) {
+              salesData.push({
+                productName: product.get("name"),
+                category: product.get("category"),
+                source: product.get("source"),
+                quantity: salesQuantity,
+                price: product.get("price"),
+              });
+            }
+          }
+
+          // 更新表格
+          const tbody = document.getElementById("salesTable");
+          tbody.innerHTML = salesData
+            .map(
+              (sale) => `
+            <tr>
+              <td>${sale.productName}</td>
+              <td>${sale.category === "drinks" ? "饮品" : "烘焙"}</td>
+              <td>${sale.source === "self_made" ? "自制" : "外采"}</td>
+              <td>${sale.quantity}</td>
+              <td>${sale.price.toFixed(2)}</td>
+              <td>${(sale.quantity * sale.price).toFixed(2)}</td>
+              <td>
+                <div class="action-buttons">
+                  <button class="btn btn-primary action-btn" onclick="editSales('${
+                    sale.id
+                  }')">编辑</button>
+                  <button class="btn btn-danger action-btn" onclick="deleteSales('${
+                    sale.id
+                  }')">删除</button>
+                </div>
+              </td>
+            </tr>
+          `
+            )
+            .join("");
+
+          // 更新汇总数据
+          updateSummary(salesData);
+          alert("销售数据更新成功！");
+        } catch (error) {
+          console.error("更新销售数据失败:", error);
+          alert("更新销售数据失败: " + error.message);
         }
       }
     </script>

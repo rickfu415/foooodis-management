@@ -425,20 +425,28 @@
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">历史盘点记录</h2>
-          <div class="filters">
-            <select
-              id="storeFilter"
-              class="filter-select"
-              onchange="filterLogs()"
+          <div style="display: flex; gap: 10px; align-items: center">
+            <div class="filters">
+              <select
+                id="storeFilter"
+                class="filter-select"
+                onchange="filterLogs()"
+              >
+                <option value="all">所有店铺</option>
+              </select>
+              <input
+                type="date"
+                id="dateFilter"
+                class="filter-select"
+                onchange="filterLogs()"
+              />
+            </div>
+            <button
+              class="btn btn-success"
+              onclick="window.location.href='update-sales.html'"
             >
-              <option value="all">所有店铺</option>
-            </select>
-            <input
-              type="date"
-              id="dateFilter"
-              class="filter-select"
-              onchange="filterLogs()"
-            />
+              更新销售数据
+            </button>
           </div>
         </div>
         <div class="table-container">
@@ -1589,6 +1597,242 @@
         } catch (error) {
           console.error("加载今日销售统计失败:", error);
           document.getElementById("todaySalesCount").textContent = "加载失败";
+        }
+      }
+
+      // 添加更新销售数据功能
+      async function updateSalesDataFromLogs() {
+        try {
+          // 获取选中的日期和店铺
+          const selectedDate = document.getElementById("dateFilter").value;
+          const selectedStore = document.getElementById("storeFilter").value;
+
+          if (!selectedDate) {
+            alert("请选择日期");
+            return;
+          }
+
+          // 确认对话框
+          if (!confirm("确定要更新所选日期的销售数据吗？")) {
+            return;
+          }
+
+          console.log("开始更新销售数据:", { selectedDate, selectedStore });
+
+          // 设置日期范围
+          const date = new Date(selectedDate + "T00:00:00.000Z");
+          const nextDay = new Date(date);
+          nextDay.setDate(nextDay.getDate() + 1);
+
+          console.log("日期范围:", { date, nextDay });
+
+          // 构建查询条件
+          const query = new AV.Query("InventoryCheck");
+          query.greaterThanOrEqualTo("date", date);
+          query.lessThan("date", nextDay);
+          if (selectedStore !== "all") {
+            query.equalTo("storeName", selectedStore);
+          }
+
+          // 获取盘点记录
+          const checks = await query.find();
+          console.log("找到盘点记录数:", checks.length);
+
+          if (checks.length === 0) {
+            alert("未找到该日期的盘点记录");
+            return;
+          }
+
+          // 按店铺分组处理数据
+          const storeGroups = new Map();
+          checks.forEach((check) => {
+            const storeName = check.get("storeName");
+            if (!storeGroups.has(storeName)) {
+              storeGroups.set(storeName, []);
+            }
+            storeGroups.get(storeName).push(check);
+          });
+
+          console.log("店铺分组:", Array.from(storeGroups.keys()));
+
+          let totalUpdated = 0;
+          let totalStores = 0;
+          let errorStores = [];
+
+          // 处理每个店铺的数据
+          for (const [storeName, storeChecks] of storeGroups) {
+            try {
+              console.log(`处理店铺 ${storeName} 的数据...`);
+
+              // 获取该店铺的开店和闭店盘点
+              const openingCheck = storeChecks.find(
+                (check) => check.get("type") === "opening"
+              );
+              const closingCheck = storeChecks.find(
+                (check) => check.get("type") === "closing"
+              );
+              const restockingChecks = storeChecks.filter(
+                (check) => check.get("type") === "restocking"
+              );
+              const lossChecks = storeChecks.filter(
+                (check) => check.get("type") === "loss"
+              );
+
+              if (!openingCheck || !closingCheck) {
+                console.warn(`店铺 ${storeName} 缺少开店或闭店盘点记录`);
+                errorStores.push(`${storeName} (缺少开店或闭店盘点)`);
+                continue;
+              }
+
+              // 查询当天该店铺的销售数据
+              const existingQuery = new AV.Query("DailyProductSales");
+              existingQuery.equalTo("storeName", storeName);
+              existingQuery.equalTo("date", date);
+              const existingRecords = await existingQuery.find();
+              console.log(`${storeName} 已有销售记录:`, existingRecords.length);
+
+              const existingMap = new Map(
+                existingRecords.map((record) => [
+                  record.get("product").id,
+                  record,
+                ])
+              );
+
+              // 计算销售数据
+              const salesData = [];
+              const recordsToUpdate = [];
+              const openingItems = openingCheck.get("items") || [];
+              const closingItems = closingCheck.get("items") || [];
+
+              console.log(`${storeName} 商品数:`, openingItems.length);
+
+              // 获取所有商品信息
+              const productIds = openingItems.map(
+                (item) => item.product.objectId
+              );
+              const Product = AV.Object.extend("Product");
+              const productQuery = new AV.Query(Product);
+              productQuery.containedIn("objectId", productIds);
+              const products = await productQuery.find();
+              const productMap = new Map(products.map((p) => [p.id, p]));
+
+              // 处理每个商品
+              for (const openingItem of openingItems) {
+                const productId = openingItem.product.objectId;
+                const product = productMap.get(productId);
+                if (!product) {
+                  console.warn(`商品不存在: ${productId}`);
+                  continue;
+                }
+
+                const closingItem = closingItems.find(
+                  (item) => item.product.objectId === productId
+                );
+                if (!closingItem) {
+                  console.warn(`缺少闭店盘点商品: ${productId}`);
+                  continue;
+                }
+
+                // 计算进货数量
+                let restockQuantity = 0;
+                restockingChecks.forEach((check) => {
+                  const restockItem = (check.get("items") || []).find(
+                    (item) => item.product.objectId === productId
+                  );
+                  if (restockItem) {
+                    restockQuantity += restockItem.quantity;
+                  }
+                });
+
+                // 计算报损数量
+                let lossQuantity = 0;
+                lossChecks.forEach((check) => {
+                  const lossItem = (check.get("items") || []).find(
+                    (item) => item.product.objectId === productId
+                  );
+                  if (lossItem) {
+                    lossQuantity += lossItem.quantity;
+                  }
+                });
+
+                // 计算销售数量：开店库存 + 进货数量 - 报损数量 - 闭店库存
+                const salesQuantity =
+                  openingItem.quantity +
+                  restockQuantity -
+                  lossQuantity -
+                  closingItem.quantity;
+
+                console.log(`${storeName} - ${product.get("name")}:`, {
+                  opening: openingItem.quantity,
+                  restock: restockQuantity,
+                  loss: lossQuantity,
+                  closing: closingItem.quantity,
+                  sales: salesQuantity,
+                });
+
+                if (salesQuantity >= 0) {
+                  const existingRecord = existingMap.get(productId);
+                  if (existingRecord) {
+                    // 更新已存在的记录
+                    existingRecord.set("quantity", salesQuantity);
+                    existingRecord.set("price", product.get("price"));
+                    existingRecord.set("category", product.get("category"));
+                    existingRecord.set("source", product.get("source"));
+                    existingRecord.set("productName", product.get("name"));
+                    recordsToUpdate.push(existingRecord);
+                  } else if (salesQuantity > 0) {
+                    // 只有销量大于0时才创建新记录
+                    const DailyProductSales =
+                      AV.Object.extend("DailyProductSales");
+                    const record = new DailyProductSales();
+                    record.set("date", date);
+                    record.set("storeName", storeName);
+                    record.set("product", product);
+                    record.set("quantity", salesQuantity);
+                    record.set("price", product.get("price"));
+                    record.set("category", product.get("category"));
+                    record.set("source", product.get("source"));
+                    record.set("productName", product.get("name"));
+                    salesData.push(record);
+                  }
+                }
+              }
+
+              // 保存销售数据
+              if (salesData.length > 0 || recordsToUpdate.length > 0) {
+                console.log(`${storeName} 保存数据:`, {
+                  new: salesData.length,
+                  update: recordsToUpdate.length,
+                });
+
+                // 保存新记录
+                if (salesData.length > 0) {
+                  await AV.Object.saveAll(salesData);
+                  totalUpdated += salesData.length;
+                }
+
+                // 保存更新的记录
+                if (recordsToUpdate.length > 0) {
+                  await AV.Object.saveAll(recordsToUpdate);
+                  totalUpdated += recordsToUpdate.length;
+                }
+
+                totalStores++;
+              }
+            } catch (storeError) {
+              console.error(`处理店铺 ${storeName} 时出错:`, storeError);
+              errorStores.push(`${storeName} (${storeError.message})`);
+            }
+          }
+
+          let message = `更新完成！\n共更新 ${totalStores} 家店铺的销售数据\n总计 ${totalUpdated} 条销售记录`;
+          if (errorStores.length > 0) {
+            message += `\n\n以下店铺处理失败：\n${errorStores.join("\n")}`;
+          }
+          alert(message);
+        } catch (error) {
+          console.error("更新销售数据失败:", error);
+          alert("更新销售数据失败: " + error.message);
         }
       }
 
