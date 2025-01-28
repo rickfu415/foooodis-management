@@ -519,7 +519,7 @@
           <input
             type="file"
             id="inventoryFile"
-            accept=".json"
+            accept=".xlsx,.xls"
             class="form-control"
             style="margin-bottom: 10px"
           />
@@ -527,9 +527,6 @@
         <div class="button-group">
           <button class="btn btn-primary" onclick="importInventoryData()">
             导入数据
-          </button>
-          <button class="btn btn-success" onclick="updateSalesData()">
-            更新销售数据
           </button>
         </div>
         <div
@@ -1048,7 +1045,7 @@
         async function readExcelFile(file) {
           return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = async function (e) {
+            reader.onload = function (e) {
               try {
                 const data = e.target.result;
                 const workbook = XLSX.read(data, { type: "array" });
@@ -1643,288 +1640,41 @@
           }
         }
 
-        // 添加盘点日志
-        function addInventoryLog(message, type = "info") {
-          const logsDiv = document.getElementById("importLogs");
-          const logEntry = document.createElement("div");
-          logEntry.className = `log-entry log-${type}`;
-          logEntry.textContent = message;
-          logsDiv.appendChild(logEntry);
-          logsDiv.scrollTop = logsDiv.scrollHeight;
-        }
-
-        // 更新盘点进度
-        function updateInventoryProgress(current, total) {
-          const progress = (current / total) * 100;
-          const progressBar = document.getElementById("importProgress");
-          progressBar.style.width = `${progress}%`;
-          progressBar.textContent = `${Math.round(progress)}%`;
-        }
-
-        let analyzedData = null; // 存储分析后的数据
-
-        async function importInventoryData() {
-          try {
-            const file = document.getElementById("inventoryFile").files[0];
-            if (!file) {
-              addInventoryLog("请选择要导入的文件", "error");
-              return;
-            }
-
-            addInventoryLog("开始读取文件...", "info");
-            const workbook = XLSX.read(await file.arrayBuffer());
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const data = XLSX.utils.sheet_to_json(worksheet);
-
-            // 按日期和店铺分组数据
-            const groupedData = new Map();
-            const stats = {
-              totalRecords: 0,
-              stores: new Set(),
-              types: new Map(),
-              storeTypes: new Map(),
-            };
-
-            for (const row of data) {
-              const dateStr = row["日期"];
-              const storeName = row["店铺名"];
+        // 格式化Excel数据
+        function formatExcelData(jsonData) {
+          return jsonData
+            .map((row) => {
+              // 检查必要字段是否存在
+              const date = row["日期"];
+              const store = row["店铺名"];
+              const type = normalizeType(row["盘点类型"]);
               const product = row["产品"];
-              const quantity = row["数量"];
-              let type = row["盘点类型"];
+              const quantity = Number(row["数量"]);
 
-              if (
-                !dateStr ||
-                !storeName ||
-                !product ||
-                quantity === undefined ||
-                !type
-              ) {
-                addInventoryLog(
-                  `跳过无效数据行: ${JSON.stringify(row)}`,
-                  "warning"
-                );
-                continue;
+              if (!date || !store || !type || !product || isNaN(quantity)) {
+                console.warn("无效数据行:", row);
+                return null;
               }
 
-              // 标准化操作类型
-              type = normalizeInventoryType(type);
-              if (!type) {
-                addInventoryLog(
-                  `未知的盘点类型: ${row["盘点类型"]}`,
-                  "warning"
-                );
-                continue;
-              }
-
-              // 将日期字符串转换为 Date 对象
-              const [year, month, day] = dateStr.split("-").map(Number);
-              const date = new Date(year, month - 1, day);
-              date.setHours(0, 0, 0, 0);
-
-              const key = `${dateStr}_${storeName}_${type}`;
-              if (!groupedData.has(key)) {
-                groupedData.set(key, {
-                  date,
-                  storeName,
-                  type,
-                  items: [],
-                });
-
-                // 更新统计信息
-                stats.totalRecords++;
-                stats.stores.add(storeName);
-                stats.types.set(type, (stats.types.get(type) || 0) + 1);
-
-                if (!stats.storeTypes.has(storeName)) {
-                  stats.storeTypes.set(storeName, new Set());
-                }
-                stats.storeTypes.get(storeName).add(type);
-              }
-              groupedData
-                .get(key)
-                .items.push({ product, quantity: Number(quantity) });
-            }
-
-            // 显示统计信息
-            addInventoryLog("\n=== 数据分析结果 ===", "stats");
-            addInventoryLog(`总盘点记录数: ${stats.totalRecords}`, "stats");
-            addInventoryLog(`涉及店铺数: ${stats.stores.size}`, "stats");
-            addInventoryLog("\n按盘点类型统计:", "stats");
-            stats.types.forEach((count, type) => {
-              addInventoryLog(`${getTypeText(type)}: ${count}条`, "stats");
-            });
-
-            addInventoryLog("\n各店铺盘点类型:", "stats");
-            stats.stores.forEach((store) => {
-              const types = Array.from(stats.storeTypes.get(store))
-                .map((type) => getTypeText(type))
-                .join(", ");
-              addInventoryLog(`${store}: ${types}`, "stats");
-            });
-
-            // 检查重复记录
-            addInventoryLog("\n开始检查重复记录...", "info");
-            const duplicates = [];
-            for (const [key, record] of groupedData.entries()) {
-              const query = new AV.Query("InventoryCheck");
-
-              // 使用日期字符串进行精确匹配
-              const dateStr = record.date.toISOString().split("T")[0];
-              addInventoryLog(
-                `检查记录: ${dateStr} ${record.storeName} ${getTypeText(
-                  record.type
-                )}`,
-                "info"
-              );
-
-              // 获取所有记录以便在日志中显示
-              query.equalTo("storeName", record.storeName);
-              query.equalTo("type", record.type);
-              const allRecords = await query.find();
-
-              // 检查每条记录的日期
-              const isDuplicate = allRecords.some((existingRecord) => {
-                const existingDateStr = existingRecord
-                  .get("date")
-                  .toISOString()
-                  .split("T")[0];
-                const isMatch = existingDateStr === dateStr;
-                if (isMatch) {
-                  addInventoryLog(
-                    `找到匹配记录: ${existingDateStr} ${existingRecord.get(
-                      "storeName"
-                    )} ${getTypeText(existingRecord.get("type"))}`,
-                    "warning"
-                  );
-                }
-                return isMatch;
-              });
-
-              if (isDuplicate) {
-                duplicates.push({
-                  date: dateStr,
-                  store: record.storeName,
-                  type: getTypeText(record.type),
-                });
-              }
-            }
-
-            if (duplicates.length > 0) {
-              addInventoryLog("\n发现重复记录:", "warning");
-              duplicates.forEach((dup) => {
-                addInventoryLog(
-                  `${dup.date} ${dup.store} ${dup.type}`,
-                  "warning"
-                );
-              });
-            } else {
-              addInventoryLog("未发现重复记录", "success");
-            }
-
-            // 保存分析结果供上传使用
-            analyzedData = {
-              groupedData,
-              duplicates,
-            };
-
-            // 显示上传按钮
-            document.getElementById("uploadButton").style.display =
-              "inline-block";
-          } catch (error) {
-            console.error("分析失败:", error);
-            addInventoryLog(`分析失败: ${error.message}`, "error");
-          }
-        }
-
-        async function uploadInventoryData() {
-          if (!analyzedData) {
-            addInventoryLog("请先分析数据文件", "error");
-            return;
-          }
-
-          try {
-            addInventoryLog("\n=== 开始上传数据 ===", "info");
-            const { groupedData, duplicates } = analyzedData;
-
-            // 创建一个Set来存储重复记录的key
-            const duplicateKeys = new Set(
-              duplicates.map(
-                (dup) => `${dup.date}_${dup.store}_${getTypeText(dup.type)}`
-              )
-            );
-
-            let uploadedCount = 0;
-            let skippedCount = 0;
-
-            for (const [key, record] of groupedData.entries()) {
-              const recordKey = `${record.date.toISOString().split("T")[0]}_${
-                record.storeName
-              }_${getTypeText(record.type)}`;
-
-              // 如果是重复记录，跳过
-              if (duplicateKeys.has(recordKey)) {
-                addInventoryLog(
-                  `跳过重复记录: ${record.date.toISOString().split("T")[0]} ${
-                    record.storeName
-                  } ${getTypeText(record.type)}`,
-                  "warning"
-                );
-                skippedCount++;
-                continue;
-              }
-
-              // 创建新记录
-              const InventoryCheck = AV.Object.extend("InventoryCheck");
-              const inventoryCheck = new InventoryCheck();
-              inventoryCheck.set("date", record.date);
-              inventoryCheck.set("storeName", record.storeName);
-              inventoryCheck.set("type", record.type);
-              inventoryCheck.set("items", record.items);
-              inventoryCheck.set("status", "submitted");
-              inventoryCheck.set("operator", AV.User.current());
-
-              await inventoryCheck.save();
-              uploadedCount++;
-
-              // 创建系统日志
-              const SystemLog = AV.Object.extend("SystemLog");
-              const log = new SystemLog();
-              log.set("type", `inventory_${record.type}`);
-              log.set("operator", AV.User.current());
-              log.set(
-                "content",
-                `${record.storeName} ${
-                  record.date.toISOString().split("T")[0]
-                } ${getTypeText(record.type)}`
-              );
-              log.set("date", record.date);
-              await log.save();
-
-              addInventoryLog(
-                `成功上传: ${record.date.toISOString().split("T")[0]} ${
-                  record.storeName
-                } ${getTypeText(record.type)}`,
-                "success"
-              );
-            }
-
-            addInventoryLog(
-              `\n上传完成: 成功上传 ${uploadedCount} 条记录，跳过 ${skippedCount} 条重复记录`,
-              "success"
-            );
-
-            // 清除分析数据
-            analyzedData = null;
-            // 隐藏上传按钮
-            document.getElementById("uploadButton").style.display = "none";
-          } catch (error) {
-            console.error("上传失败:", error);
-            addInventoryLog(`上传失败: ${error.message}`, "error");
-          }
+              return {
+                date: date,
+                store: store,
+                type: type,
+                items: [
+                  {
+                    product: product,
+                    quantity: quantity,
+                  },
+                ],
+              };
+            })
+            .filter((row) => row !== null);
         }
 
         // 标准化盘点类型
-        function normalizeInventoryType(type) {
+        function normalizeType(type) {
+          if (!type) return null;
+
           switch (type.trim()) {
             case "开店":
             case "开店盘点":
@@ -1939,23 +1689,95 @@
             case "报损盘点":
               return "loss";
             default:
+              console.warn("未知的盘点类型:", type);
               return null;
           }
         }
 
-        // 辅助函数：获取盘点类型的中文显示
-        function getTypeText(type) {
-          switch (type) {
-            case "opening":
-              return "开店盘点";
-            case "closing":
-              return "闭店盘点";
-            case "restocking":
-              return "进货盘点";
-            case "loss":
-              return "报损盘点";
-            default:
-              return type;
+        // 读取Excel文件
+        async function readExcelFile(file) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                // 格式化数据
+                const formattedData = formatExcelData(jsonData);
+                if (formattedData.length === 0) {
+                  reject(new Error("没有有效的数据行"));
+                  return;
+                }
+
+                resolve(formattedData);
+              } catch (error) {
+                reject(error);
+              }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+          });
+        }
+
+        // 导入盘点数据
+        async function importInventoryData() {
+          const statusDiv = document.getElementById("importStatus");
+          try {
+            const file = document.getElementById("inventoryFile").files[0];
+            if (!file) {
+              statusDiv.textContent = "请选择要导入的文件";
+              return;
+            }
+
+            statusDiv.textContent = "正在读取文件...";
+            const data = await readExcelFile(file);
+
+            statusDiv.textContent = "正在处理数据...";
+            const InventoryCheck = AV.Object.extend("InventoryCheck");
+            const currentUser = AV.User.current();
+
+            // 按店铺和日期分组数据
+            const groupedData = new Map();
+            data.forEach((row) => {
+              const key = `${row.date}_${row.store}_${row.type}`;
+              if (!groupedData.has(key)) {
+                groupedData.set(key, {
+                  date: row.date,
+                  store: row.store,
+                  type: row.type,
+                  items: [],
+                });
+              }
+              groupedData.get(key).items.push(...row.items);
+            });
+
+            // 保存分组后的数据
+            let savedCount = 0;
+            for (const [key, record] of groupedData) {
+              const check = new InventoryCheck();
+              // 直接使用日期字符串，不进行时区转换
+              const [year, month, day] = record.date.split("-").map(Number);
+              const date = new Date(year, month - 1, day);
+              date.setHours(0, 0, 0, 0);
+              check.set("date", date);
+              check.set("storeName", record.store);
+              check.set("type", record.type);
+              check.set("items", record.items);
+              check.set("operator", currentUser);
+              check.set("status", "submitted");
+
+              await check.save();
+              savedCount++;
+              statusDiv.textContent = `正在导入... (${savedCount}/${groupedData.size})`;
+            }
+
+            statusDiv.textContent = `导入完成！共导入 ${savedCount} 条记录`;
+          } catch (error) {
+            console.error("导入失败:", error);
+            statusDiv.textContent = "导入失败: " + error.message;
           }
         }
 
@@ -2240,10 +2062,10 @@
                           <button class="btn btn-danger action-btn" onclick="deleteStore('${store.get(
                             "storeId"
                           )}')">删除</button>
-                        </div>
+                  </div>
                       </td>
                     </tr>
-                  `;
+              `;
                 })
                 .join("");
             } else {

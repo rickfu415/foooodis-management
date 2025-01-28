@@ -5,13 +5,15 @@
     <title>更新销售数据 - 食圈儿</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="css/update-sales.css" />
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
     <script src="js/update-sales.js"></script>
   </head>
   <body>
     <div class="container">
+      <!-- 第一个卡片：历史盘点记录 -->
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">更新销售数据</h2>
+          <h2 class="card-title">历史盘点记录</h2>
           <button
             class="btn btn-secondary"
             onclick="window.location.href='admin-panel.html'"
@@ -20,7 +22,129 @@
           </button>
         </div>
         <div class="update-sales-container">
-          <!-- 这里将添加更新销售数据的内容 -->
+          <div class="filters">
+            <select
+              id="storeFilter"
+              class="filter-select"
+              onchange="filterLogs()"
+            >
+              <option value="all">所有店铺</option>
+            </select>
+            <input
+              type="date"
+              id="dateFilter"
+              class="filter-select"
+              onchange="filterLogs()"
+            />
+          </div>
+          <div class="table-container">
+            <div class="statistics-bar">
+              <div class="stat-item">
+                <span class="stat-label">总记录数:</span>
+                <span id="totalCount" class="stat-value">0</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">开店盘点:</span>
+                <span id="openingCount" class="stat-value">0</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">闭店盘点:</span>
+                <span id="closingCount" class="stat-value">0</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">进货盘点:</span>
+                <span id="restockingCount" class="stat-value">0</span>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th onclick="sortLogs('time')" class="sortable">
+                    上传时间 <span class="sort-icon">↓</span>
+                  </th>
+                  <th onclick="sortLogs('date')" class="sortable">
+                    盘点日期 <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortLogs('type')" class="sortable">
+                    操作类型 <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortLogs('operator')" class="sortable">
+                    操作人 <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortLogs('store')" class="sortable">
+                    店铺 <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortLogs('productCount')" class="sortable">
+                    商品数量 <span class="sort-icon"></span>
+                  </th>
+                  <th>操作</th>
+                  <th>删除</th>
+                </tr>
+              </thead>
+              <tbody id="logsList">
+                <!-- 日志列表将通过 JavaScript 动态生成 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第二个卡片：盘点记录列表 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">盘点记录列表</h2>
+          <button class="btn btn-primary" onclick="generateSalesData()">
+            生成销售数据
+          </button>
+        </div>
+        <div class="update-sales-container">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>店铺</th>
+                  <th>日期</th>
+                  <th>商品名称</th>
+                  <th>开店盘点</th>
+                  <th>进货盘点</th>
+                  <th>报损盘点</th>
+                  <th>闭店盘点</th>
+                  <th>销售数量</th>
+                </tr>
+              </thead>
+              <tbody id="selectedLogsList">
+                <!-- 选中的盘点记录将通过 JavaScript 动态生成 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第三个卡片：销售数据列表 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">销售数据列表</h2>
+          <div id="salesGenerationStatus" class="generation-status"></div>
+        </div>
+        <div class="update-sales-container">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>店铺</th>
+                  <th>日期</th>
+                  <th>商品名称</th>
+                  <th>销售数量</th>
+                  <th>单价</th>
+                  <th>商品分类</th>
+                  <th>商品来源</th>
+                </tr>
+              </thead>
+              <tbody id="salesDataList">
+                <!-- 销售数据列表将通过 JavaScript 动态生成 -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
