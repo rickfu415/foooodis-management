@@ -124,7 +124,12 @@
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">销售数据列表</h2>
-          <div id="salesGenerationStatus" class="generation-status"></div>
+          <div style="display: flex; gap: 10px; align-items: center">
+            <button class="btn btn-primary" onclick="uploadSalesData()">
+              上传销售记录
+            </button>
+            <div id="salesGenerationStatus" class="generation-status"></div>
+          </div>
         </div>
         <div class="update-sales-container">
           <div class="table-container">

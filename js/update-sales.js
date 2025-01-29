@@ -484,34 +484,8 @@ async function generateSalesData() {
       }
     }
 
-    // 设置日期
-    const date = new Date(selectedDate + "T00:00:00.000Z");
-
-    // 生成销售数据记录
-    const salesData = [];
-    for (const result of successResults) {
-      const DailyProductSales = AV.Object.extend("DailyProductSales");
-      const salesRecord = new DailyProductSales();
-
-      salesRecord.set("date", date);
-      salesRecord.set("storeName", selectedStore);
-      salesRecord.set("product", result.product);
-      salesRecord.set("quantity", result.salesQuantity);
-      salesRecord.set("price", result.product.get("price"));
-      salesRecord.set("category", result.product.get("category"));
-      salesRecord.set("source", result.product.get("source"));
-      salesRecord.set("productName", result.product.get("name"));
-
-      salesData.push(salesRecord);
-    }
-
-    // 保存销售数据
-    if (salesData.length > 0) {
-      await AV.Object.saveAll(salesData);
-    }
-
     // 更新状态显示
-    let statusMessage = `成功生成 ${salesData.length} 条销售数据`;
+    let statusMessage = `成功生成 ${successResults.length} 条销售数据`;
     if (missingProducts.length > 0) {
       statusMessage += `\n未找到以下 ${missingProducts.length} 个商品:\n`;
       missingProducts.forEach((item) => {
@@ -569,4 +543,102 @@ function renderSalesData(productResults) {
       `;
     })
     .join("");
+}
+
+// 上传销售记录
+async function uploadSalesData() {
+  const selectedDate = document.getElementById("dateFilter").value;
+  const selectedStore = document.getElementById("storeFilter").value;
+
+  if (!selectedDate) {
+    alert("请选择日期");
+    return;
+  }
+
+  if (selectedStore === "all") {
+    alert("请选择具体店铺");
+    return;
+  }
+
+  try {
+    // 获取销售数据列表中的所有行
+    const rows = document.querySelectorAll("#salesDataList tr");
+    if (!rows.length) {
+      throw new Error("没有找到销售数据");
+    }
+
+    // 更新状态显示
+    const statusElement = document.getElementById("salesGenerationStatus");
+    statusElement.textContent = "正在上传销售记录...";
+    statusElement.className = "generation-status processing";
+
+    // 设置日期（只使用年月日）
+    const [year, month, day] = selectedDate.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+
+    // 准备销售数据
+    const salesData = [];
+    const duplicateProducts = [];
+
+    // 处理每一行数据
+    for (const row of Array.from(rows)) {
+      const cells = row.cells;
+      if (!cells || cells.length < 7) continue; // 跳过表头或无效行
+
+      const productName = cells[2].textContent;
+      const quantity = parseInt(cells[3].textContent, 10);
+      const price = parseFloat(cells[4].textContent.replace("¥", ""));
+      const category = cells[5].textContent;
+      const source = cells[6].textContent;
+
+      // 检查是否存在重复记录
+      const query = new AV.Query("DailyProductSales");
+      query.equalTo("date", date);
+      query.equalTo("storeName", selectedStore);
+      query.equalTo("productName", productName);
+      const existingRecord = await query.first();
+
+      if (existingRecord) {
+        // 记录重复的商品
+        duplicateProducts.push(productName);
+        continue; // 跳过这条记录
+      }
+
+      // 创建新记录
+      const DailyProductSales = AV.Object.extend("DailyProductSales");
+      const salesRecord = new DailyProductSales();
+
+      salesRecord.set("date", date);
+      salesRecord.set("storeName", selectedStore);
+      salesRecord.set("productName", productName);
+      salesRecord.set("quantity", quantity);
+      salesRecord.set("price", price);
+      salesRecord.set("category", category === "-" ? "" : category);
+      salesRecord.set("source", source === "-" ? "" : source);
+
+      salesData.push(salesRecord);
+    }
+
+    // 保存销售数据
+    if (salesData.length > 0) {
+      await AV.Object.saveAll(salesData);
+    }
+
+    // 更新状态显示
+    let statusMessage = `成功上传 ${salesData.length} 条销售记录`;
+    if (duplicateProducts.length > 0) {
+      statusMessage += `\n以下 ${
+        duplicateProducts.length
+      } 个商品已存在，已跳过：\n${duplicateProducts.join("\n")}`;
+      statusElement.className = "generation-status warning";
+    } else {
+      statusElement.className = "generation-status success";
+    }
+    statusElement.textContent = statusMessage;
+  } catch (error) {
+    console.error("上传销售记录失败:", error);
+    const statusElement = document.getElementById("salesGenerationStatus");
+    statusElement.textContent = "上传销售记录失败: " + error.message;
+    statusElement.className = "generation-status error";
+  }
 }
