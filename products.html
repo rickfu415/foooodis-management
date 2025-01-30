@@ -242,10 +242,23 @@
         <form onsubmit="addProduct(event)">
           <div class="form-group">
             <label>品类</label>
-            <select name="category" required>
-              <option value="drinks">饮品</option>
-              <option value="bakery">烘焙</option>
+            <select
+              name="category"
+              required
+              onchange="handleCategoryChange(this)"
+            >
+              <option value="饮品类">饮品类</option>
+              <option value="烘焙类">烘焙类</option>
+              <option value="港式点心">港式点心</option>
+              <option value="材料">材料</option>
+              <option value="new">+ 新建类型</option>
             </select>
+            <input
+              type="text"
+              id="newCategory"
+              style="display: none; margin-top: 10px"
+              placeholder="请输入新的品类名称"
+            />
           </div>
           <div class="form-group">
             <label>商品名称</label>
@@ -253,11 +266,20 @@
           </div>
           <div class="form-group">
             <label>价格</label>
-            <select name="price" required>
-              <option value="6">6元</option>
-              <option value="8">8元</option>
-              <option value="10">10元</option>
-              <option value="12">12元</option>
+            <input
+              type="number"
+              name="price"
+              required
+              min="0"
+              step="0.1"
+              placeholder="请输入商品价格"
+            />
+          </div>
+          <div class="form-group">
+            <label>来源</label>
+            <select name="source" required>
+              <option value="purchased">外采</option>
+              <option value="self_made">自制</option>
             </select>
           </div>
           <button type="submit" class="btn btn-primary">添加商品</button>
@@ -276,10 +298,10 @@
             onchange="filterProducts()"
           >
             <option value="all">所有类别</option>
-            <option value="main_dish">主食类</option>
-            <option value="snack">小吃类</option>
-            <option value="drink">饮品类</option>
-            <option value="bakery">烘焙类</option>
+            <option value="饮品类">饮品类</option>
+            <option value="烘焙类">烘焙类</option>
+            <option value="港式点心">港式点心</option>
+            <option value="材料">材料</option>
           </select>
           <select
             id="sourceFilter"
@@ -346,6 +368,80 @@
           <span id="pageInfo">第 1 页，共 1 页</span>
           <button class="btn btn-sm" onclick="nextPage()">下一页 &gt;</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 编辑商品模态框 -->
+    <div
+      id="editModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+      "
+    >
+      <div
+        style="
+          position: relative;
+          width: 90%;
+          max-width: 500px;
+          margin: 50px auto;
+          background: white;
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        "
+      >
+        <h3 class="section-title">编辑商品</h3>
+        <form id="editForm" onsubmit="saveEdit(event)">
+          <input type="hidden" id="editProductId" />
+          <div class="form-group">
+            <label>品类</label>
+            <select name="category" required>
+              <option value="饮品类">饮品类</option>
+              <option value="烘焙类">烘焙类</option>
+              <option value="港式点心">港式点心</option>
+              <option value="材料">材料</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>商品名称</label>
+            <input type="text" name="name" required />
+          </div>
+          <div class="form-group">
+            <label>价格</label>
+            <input type="number" name="price" required min="0" step="0.1" />
+          </div>
+          <div class="form-group">
+            <label>来源</label>
+            <select name="source" required>
+              <option value="purchased">外采</option>
+              <option value="self_made">自制</option>
+            </select>
+          </div>
+          <div
+            style="
+              display: flex;
+              justify-content: flex-end;
+              gap: 10px;
+              margin-top: 20px;
+            "
+          >
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onclick="closeEditModal()"
+            >
+              取消
+            </button>
+            <button type="submit" class="btn btn-primary">保存</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -536,18 +632,179 @@
 
       // 获取类型文本
       function getCategoryText(category) {
-        const categoryMap = {
-          main_dish: "主食类",
-          snack: "小吃类",
-          drink: "饮品类",
-          bakery: "烘焙类",
-        };
-        return categoryMap[category] || category;
+        return category || "未知类别";
       }
 
       // 获取来源文本
       function getSourceText(source) {
         return source === "self_made" ? "自制" : "外采";
+      }
+
+      // 处理品类选择变化
+      function handleCategoryChange(select) {
+        const newCategoryInput = document.getElementById("newCategory");
+        if (select.value === "new") {
+          newCategoryInput.style.display = "block";
+          newCategoryInput.required = true;
+          select.required = false;
+        } else {
+          newCategoryInput.style.display = "none";
+          newCategoryInput.required = false;
+          select.required = true;
+        }
+      }
+
+      // 修改添加商品函数
+      async function addProduct(event) {
+        event.preventDefault();
+
+        try {
+          const form = event.target;
+          const name = form.name.value;
+          const categorySelect = form.category;
+          const newCategoryInput = document.getElementById("newCategory");
+          const source = form.source.value;
+
+          // 获取实际的类别值
+          const category =
+            categorySelect.value === "new"
+              ? newCategoryInput.value.trim()
+              : categorySelect.value;
+
+          // 验证新类别不为空
+          if (categorySelect.value === "new" && !category) {
+            alert("请输入新的品类名称");
+            return;
+          }
+
+          const price = parseFloat(form.price.value);
+
+          // 创建新商品
+          const Product = AV.Object.extend("Product");
+          const product = new Product();
+
+          product.set("name", name);
+          product.set("category", category);
+          product.set("price", price);
+          product.set("source", source);
+
+          await product.save();
+
+          // 如果是新类别，添加到筛选器的选项中
+          if (categorySelect.value === "new") {
+            const filterSelect = document.getElementById("categoryFilter");
+            const option = document.createElement("option");
+            option.value = category;
+            option.textContent = category;
+            filterSelect.insertBefore(option, filterSelect.lastElementChild);
+
+            // 同时添加到添加商品表单的选项中
+            const newOption = document.createElement("option");
+            newOption.value = category;
+            newOption.textContent = category;
+            categorySelect.insertBefore(
+              newOption,
+              categorySelect.lastElementChild
+            );
+          }
+
+          // 重置表单
+          form.reset();
+          newCategoryInput.style.display = "none";
+          categorySelect.required = true;
+          newCategoryInput.required = false;
+
+          // 刷新商品列表
+          await fetchProducts();
+
+          alert("商品添加成功！");
+        } catch (error) {
+          console.error("添加商品失败:", error);
+          alert("添加商品失败: " + error.message);
+        }
+      }
+
+      // 编辑商品
+      async function editProduct(productId) {
+        try {
+          // 查询商品
+          const query = new AV.Query("Product");
+          const product = await query.get(productId);
+
+          // 填充表单
+          const form = document.getElementById("editForm");
+          form.category.value = product.get("category");
+          form.name.value = product.get("name");
+          form.price.value = product.get("price");
+          form.source.value = product.get("source");
+
+          // 保存商品ID
+          document.getElementById("editProductId").value = productId;
+
+          // 显示模态框
+          document.getElementById("editModal").style.display = "block";
+        } catch (error) {
+          console.error("加载商品信息失败:", error);
+          alert("加载商品信息失败: " + error.message);
+        }
+      }
+
+      // 关闭编辑模态框
+      function closeEditModal() {
+        document.getElementById("editModal").style.display = "none";
+      }
+
+      // 保存编辑
+      async function saveEdit(event) {
+        event.preventDefault();
+
+        try {
+          const form = event.target;
+          const productId = document.getElementById("editProductId").value;
+
+          // 查询商品
+          const query = new AV.Query("Product");
+          const product = await query.get(productId);
+
+          // 更新商品信息
+          product.set("category", form.category.value);
+          product.set("name", form.name.value);
+          product.set("price", parseFloat(form.price.value));
+          product.set("source", form.source.value);
+
+          await product.save();
+
+          // 关闭模态框
+          closeEditModal();
+
+          // 刷新商品列表
+          await fetchProducts();
+          alert("商品更新成功！");
+        } catch (error) {
+          console.error("保存商品失败:", error);
+          alert("保存商品失败: " + error.message);
+        }
+      }
+
+      // 删除商品
+      async function deleteProduct(productId) {
+        try {
+          if (!confirm("确定要删除这个商品吗？删除后将无法恢复。")) {
+            return;
+          }
+
+          // 查询并删除商品
+          const query = new AV.Query("Product");
+          const product = await query.get(productId);
+          await product.destroy();
+
+          // 刷新商品列表
+          await fetchProducts();
+          alert("商品删除成功！");
+        } catch (error) {
+          console.error("删除商品失败:", error);
+          alert("删除商品失败: " + error.message);
+        }
       }
 
       // 页面加载时执行
