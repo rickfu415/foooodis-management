@@ -156,20 +156,43 @@
     </header>
 
     <div class="container">
+      <!-- 历史记录 -->
+      <div class="history-section" style="margin-bottom: 20px">
+        <div
+          class="container"
+          style="
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+          "
+        >
+          <h3 class="section-title">今日开店盘点记录</h3>
+          <div id="historyList">
+            <!-- 将通过 JavaScript 动态填充 -->
+          </div>
+        </div>
+      </div>
+
       <!-- 开店盘点表单 -->
       <div class="inventory-form">
         <h3 class="section-title">开店盘点</h3>
         <div class="form-group">
           <label>盘点日期</label>
-          <input type="datetime-local" id="checkDate" required />
+          <input
+            type="datetime-local"
+            id="checkDate"
+            required
+            onchange="handleDateChange()"
+          />
         </div>
         <table class="inventory-table">
           <thead>
             <tr>
-              <th>商品名称</th>
               <th>类别</th>
+              <th>单价</th>
+              <th>商品名称</th>
               <th>当前库存</th>
-              <th>备注</th>
             </tr>
           </thead>
           <tbody id="inventoryList">
@@ -183,14 +206,6 @@
         >
           提交开店盘点
         </button>
-      </div>
-
-      <!-- 历史记录 -->
-      <div class="history-section">
-        <h3 class="section-title">今日开店盘点记录</h3>
-        <div id="historyList">
-          <!-- 将通过 JavaScript 动态填充 -->
-        </div>
       </div>
     </div>
 
@@ -218,22 +233,80 @@
       // 加载商品列表
       async function loadProductList() {
         try {
+          // 获取店铺信息
+          const storeData = JSON.parse(
+            localStorage.getItem("selectedStore") || "{}"
+          );
+          if (!storeData.id) {
+            console.error("未选择店铺");
+            return;
+          }
+
+          // 获取选择的日期
+          const selectedDate = new Date(
+            document.getElementById("checkDate").value
+          );
+          const previousDay = new Date(selectedDate);
+          previousDay.setDate(previousDay.getDate() - 1);
+          previousDay.setHours(0, 0, 0, 0);
+          const previousDayEnd = new Date(previousDay);
+          previousDayEnd.setHours(23, 59, 59, 999);
+
+          // 查询前一天的闭店盘点记录
+          const closingQuery = new AV.Query("InventoryCheck");
+          closingQuery.equalTo("type", "closing");
+          closingQuery.equalTo("storeId", storeData.id);
+          closingQuery.greaterThanOrEqualTo("date", previousDay);
+          closingQuery.lessThanOrEqualTo("date", previousDayEnd);
+          closingQuery.descending("date");
+          const closingCheck = await closingQuery.first();
+
+          if (!closingCheck) {
+            alert(
+              `警告：未找到 ${previousDay.toLocaleDateString()} 的闭店盘点记录！\n请先完成前一天的闭店盘点。`
+            );
+          }
+
+          const closingItems = closingCheck ? closingCheck.get("items") : [];
+          const closingItemMap = {};
+          closingItems.forEach((item) => {
+            closingItemMap[item.product] = item.quantity;
+          });
+
+          // 加载商品列表
           const query = new AV.Query("Product");
+          query.ascending("category"); // 按类别排序
           const products = await query.find();
 
           const listElement = document.getElementById("inventoryList");
           listElement.innerHTML = products
             .map((product) => {
               const name = product.get("name");
-              const category =
-                product.get("category") === "drinks" ? "饮品" : "烘焙";
+              const category = product.get("category");
+              const price = product.get("price");
+              const closingQuantity = closingItemMap[name] || 0;
 
               return `
               <tr data-id="${product.id}">
-                <td>${name}</td>
                 <td>${category}</td>
-                <td><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="stock-count" onchange="moveToNext(this)" /></td>
-                <td><input type="text" class="note-field" placeholder="填写备注..." /></td>
+                <td>¥${price.toFixed(2)}</td>
+                <td>${name}</td>
+                <td>
+                  <input 
+                    type="number" 
+                    inputmode="numeric" 
+                    pattern="[0-9]*" 
+                    min="0" 
+                    class="stock-count" 
+                    value="${closingQuantity}"
+                    onchange="moveToNext(this)" 
+                  />
+                  ${
+                    closingCheck
+                      ? `<div style="font-size: 12px; color: #666;">昨日闭店：${closingQuantity}</div>`
+                      : `<div style="font-size: 12px; color: #f00;">无昨日数据</div>`
+                  }
+                </td>
               </tr>
             `;
             })
@@ -291,6 +364,17 @@
             return;
           }
 
+          // 获取所有商品信息用于显示类别和价格
+          const productQuery = new AV.Query("Product");
+          const products = await productQuery.find();
+          const productMap = {};
+          products.forEach((product) => {
+            productMap[product.get("name")] = {
+              category: product.get("category"),
+              price: product.get("price"),
+            };
+          });
+
           historyElement.innerHTML = checks
             .map((check) => {
               const date = check.get("date");
@@ -310,18 +394,37 @@
                   <span>操作人：${operatorName}</span>
                 </div>
                 <div class="history-content">
-                  ${items
-                    .map(
-                      (item) => `
-                    <div class="history-product">
-                      <span>${item.productName || "未知商品"}</span>
-                      <span>${item.quantity}个 ${
-                        item.note ? `(${item.note})` : ""
-                      }</span>
-                    </div>
-                  `
-                    )
-                    .join("")}
+                  <table class="inventory-table" style="width: 100%;">
+                    <thead>
+                      <tr>
+                        <th>类别</th>
+                        <th>单价</th>
+                        <th>商品名称</th>
+                        <th>数量</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${items
+                        .map((item) => {
+                          const productInfo = productMap[item.product] || {};
+                          return `
+                              <tr>
+                                <td>${productInfo.category || "未知类别"}</td>
+                                <td>¥${(productInfo.price || 0).toFixed(2)}</td>
+                                <td>${item.product}</td>
+                                <td>${item.quantity}个</td>
+                                <td>
+                                  <button class="btn btn-sm btn-primary" onclick="editHistoryItem('${
+                                    check.id
+                                  }', '${item.product}')">修改</button>
+                                </td>
+                              </tr>
+                            `;
+                        })
+                        .join("")}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             `;
@@ -330,6 +433,42 @@
         } catch (error) {
           console.error("加载历史记录失败:", error);
           alert("加载历史记录失败，请重试");
+        }
+      }
+
+      // 修改历史记录中的商品数量
+      async function editHistoryItem(checkId, productName) {
+        try {
+          const query = new AV.Query("InventoryCheck");
+          const check = await query.get(checkId);
+          const items = check.get("items");
+
+          const item = items.find((item) => item.product === productName);
+          if (!item) {
+            alert("未找到该商品记录");
+            return;
+          }
+
+          const newQuantity = prompt("请输入新的数量：", item.quantity);
+          if (newQuantity === null) return; // 用户取消
+
+          const quantity = parseInt(newQuantity);
+          if (isNaN(quantity) || quantity < 0) {
+            alert("请输入有效的数量");
+            return;
+          }
+
+          // 更新数量
+          item.quantity = quantity;
+          check.set("items", items);
+          await check.save();
+
+          // 刷新显示
+          await loadTodayHistory();
+          alert("修改成功");
+        } catch (error) {
+          console.error("修改记录失败:", error);
+          alert("修改失败: " + error.message);
         }
       }
 
@@ -343,9 +482,20 @@
             return;
           }
 
+          // 检查是否是管理员
+          const role = currentUser.get("role");
+          if (role !== "admin") {
+            alert("您没有权限提交盘点记录");
+            return;
+          }
+
           const date = document.getElementById("checkDate").value;
-          const items = [];
-          let hasItems = false;
+          const submitDate = new Date(date);
+          // 设置时间为当天的0点，用于查重
+          const checkDate = new Date(submitDate);
+          checkDate.setHours(0, 0, 0, 0);
+          const nextDay = new Date(checkDate);
+          nextDay.setDate(nextDay.getDate() + 1);
 
           // 获取店铺信息
           const storeData = JSON.parse(
@@ -357,25 +507,42 @@
             return;
           }
 
+          // 检查是否已存在相同日期的记录
+          const query = new AV.Query("InventoryCheck");
+          query.equalTo("type", "opening");
+          query.equalTo("storeId", storeData.id);
+          query.greaterThanOrEqualTo("date", checkDate);
+          query.lessThan("date", nextDay);
+          const existingCheck = await query.first();
+
+          if (existingCheck) {
+            const existingDate = existingCheck.get("date");
+            const dateStr = existingDate.toLocaleString("zh-CN", {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            alert(`该日期 (${dateStr}) 已存在开店盘点记录，请使用修改功能。`);
+            return;
+          }
+
+          const items = [];
+          let hasItems = false;
+
           // 收集表单数据
           document.querySelectorAll("#inventoryList tr").forEach((row) => {
-            const productId = row.dataset.id;
             const quantity =
               parseInt(row.querySelector(".stock-count").value) || 0;
-            const note = row.querySelector(".note-field").value;
-            const productName = row.querySelector("td").textContent;
+            const productName =
+              row.querySelector("td:nth-child(3)").textContent;
 
             if (quantity > 0) {
               hasItems = true;
               items.push({
-                product: {
-                  __type: "Pointer",
-                  className: "Product",
-                  objectId: productId,
-                },
+                product: productName,
                 quantity: quantity,
-                note: note,
-                productName: productName,
               });
             }
           });
@@ -385,8 +552,19 @@
             return;
           }
 
-          // 显示确认对话框
-          if (!confirm("确认提交开店盘点记录吗？提交后将返回工作台。")) {
+          // 显示确认对话框，包含日期信息
+          const dateStr = submitDate.toLocaleString("zh-CN", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          if (
+            !confirm(
+              `确认提交 ${dateStr} 的开店盘点记录吗？提交后将返回工作台。`
+            )
+          ) {
             return;
           }
 
@@ -395,7 +573,7 @@
           const check = new InventoryCheck();
 
           check.set("type", "opening");
-          check.set("date", new Date(date));
+          check.set("date", submitDate);
           check.set("items", items);
           check.set("operator", currentUser);
           check.set("status", "submitted");
@@ -403,6 +581,7 @@
           check.set("storeName", storeData.name);
 
           await check.save();
+          alert("盘点记录提交成功！");
           // 提交成功后直接返回工作台
           localStorage.setItem("inventoryUpdated", new Date().getTime());
           window.location.href = "dashboard.html";
@@ -422,6 +601,11 @@
           console.error("登出失败:", error);
           alert("登出失败，请重试");
         }
+      }
+
+      // 监听日期变化
+      function handleDateChange() {
+        loadProductList();
       }
 
       // 页面加载时执行

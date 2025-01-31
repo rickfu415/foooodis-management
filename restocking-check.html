@@ -169,14 +169,24 @@
           <label>盘点日期</label>
           <input type="datetime-local" id="checkDate" required />
         </div>
+        <div class="form-group">
+          <label>商品类别</label>
+          <select id="categoryFilter" onchange="filterByCategory()">
+            <option value="all">所有类别</option>
+            <option value="饮品类">饮品类</option>
+            <option value="烘焙类">烘焙类</option>
+            <option value="港式点心">港式点心</option>
+            <option value="材料">材料</option>
+          </select>
+        </div>
         <table class="inventory-table">
           <thead>
             <tr>
-              <th>商品名称</th>
               <th>类别</th>
-              <th>当前库存</th>
+              <th>单价</th>
+              <th>商品名称</th>
+              <th>开店库存</th>
               <th>进货数量</th>
-              <th>备注</th>
             </tr>
           </thead>
           <tbody id="inventoryList">
@@ -222,8 +232,8 @@
         ).value = `${year}-${month}-${day}T${hours}:${minutes}`;
       }
 
-      // 获取当前库存
-      async function getCurrentStock(productId) {
+      // 获取开店库存
+      async function getOpeningStocks() {
         try {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -233,47 +243,33 @@
             localStorage.getItem("selectedStore") || "{}"
           );
           if (!storeData.id) {
-            return 0;
+            return {};
           }
 
-          // 获取最近的开店盘点记录
+          // 获取今日开店盘点记录
           const openingQuery = new AV.Query("InventoryCheck");
           openingQuery.equalTo("type", "opening");
           openingQuery.equalTo("storeId", storeData.id);
-          openingQuery.lessThanOrEqualTo("date", new Date());
-          openingQuery.descending("date");
+          openingQuery.greaterThanOrEqualTo("date", today);
+          openingQuery.lessThan(
+            "date",
+            new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          );
           const openingCheck = await openingQuery.first();
-
-          let currentStock = 0;
 
           if (openingCheck) {
             const items = openingCheck.get("items");
-            const item = items.find((i) => i.product.objectId === productId);
-            if (item) {
-              currentStock = item.quantity;
-            }
+            const stockMap = {};
+            items.forEach((item) => {
+              stockMap[item.product] = item.quantity;
+            });
+            return stockMap;
           }
 
-          // 获取进货记录
-          const restockingQuery = new AV.Query("InventoryCheck");
-          restockingQuery.equalTo("type", "restocking");
-          restockingQuery.equalTo("storeId", storeData.id);
-          restockingQuery.greaterThanOrEqualTo("date", today);
-          const restockingChecks = await restockingQuery.find();
-
-          // 计算进货总量
-          restockingChecks.forEach((check) => {
-            const items = check.get("items");
-            const item = items.find((i) => i.product.objectId === productId);
-            if (item) {
-              currentStock += item.quantity;
-            }
-          });
-
-          return currentStock;
+          return {};
         } catch (error) {
-          console.error("获取当前库存失败:", error);
-          return 0;
+          console.error("获取开店库存失败:", error);
+          return {};
         }
       }
 
@@ -281,32 +277,55 @@
       async function loadProductList() {
         try {
           const query = new AV.Query("Product");
+          query.ascending("category"); // 按类别排序
           const products = await query.find();
-
-          const listElement = document.getElementById("inventoryList");
-          const productRows = await Promise.all(
-            products.map(async (product) => {
-              const name = product.get("name");
-              const category =
-                product.get("category") === "drinks" ? "饮品" : "烘焙";
-              const currentStock = await getCurrentStock(product.id);
-
-              return `
-              <tr data-id="${product.id}">
-                <td>${name}</td>
-                <td>${category}</td>
-                <td><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="stock-count" onchange="moveToNext(this)" /></td>
-                <td><input type="text" class="note-field" placeholder="填写备注..." /></td>
-              </tr>
-            `;
-            })
-          );
-
-          listElement.innerHTML = productRows.join("");
+          window.allProducts = products; // 保存所有商品到全局变量
+          
+          // 获取所有商品的开店库存
+          window.openingStocks = await getOpeningStocks();
+          
+          filterByCategory(); // 初始显示所有商品
         } catch (error) {
           console.error("加载商品列表失败:", error);
           alert("加载商品列表失败，请重试");
         }
+      }
+
+      // 按类别筛选商品
+      function filterByCategory() {
+        const selectedCategory =
+          document.getElementById("categoryFilter").value;
+        const listElement = document.getElementById("inventoryList");
+
+        const filteredProducts =
+          selectedCategory === "all"
+            ? window.allProducts
+            : window.allProducts.filter(
+                (product) => product.get("category") === selectedCategory
+              );
+
+        listElement.innerHTML = filteredProducts
+          .map((product) => {
+            const name = product.get("name");
+            const category = product.get("category");
+            const price = product.get("price");
+            const openingStock = window.openingStocks[name] || 0;
+
+            return `
+              <tr data-id="${product.id}">
+                <td>${category}</td>
+                <td>¥${price.toFixed(2)}</td>
+                <td>${name}</td>
+                <td>
+                  <div class="current-stock">${openingStock}</div>
+                </td>
+                <td>
+                  <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="stock-count" onchange="moveToNext(this)" />
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
       }
 
       // 自动跳转到下一个输入框
@@ -424,23 +443,16 @@
 
           // 收集表单数据
           document.querySelectorAll("#inventoryList tr").forEach((row) => {
-            const productId = row.dataset.id;
             const quantity =
               parseInt(row.querySelector(".stock-count").value) || 0;
-            const note = row.querySelector(".note-field").value;
-            const productName = row.querySelector("td").textContent;
+            const productName =
+              row.querySelector("td:nth-child(3)").textContent;
 
             if (quantity > 0) {
               hasItems = true;
               items.push({
-                product: {
-                  __type: "Pointer",
-                  className: "Product",
-                  objectId: productId,
-                },
+                product: productName,
                 quantity: quantity,
-                note: note,
-                productName: productName,
               });
             }
           });

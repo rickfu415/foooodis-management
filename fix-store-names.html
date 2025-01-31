@@ -1109,7 +1109,7 @@
         // 页面加载时执行
         window.onload = async function () {
           try {
-            await checkAdmin();
+          await checkAdmin();
             console.log("管理员验证通过");
 
             // 设置日期选择器的默认值为今天
@@ -1729,8 +1729,8 @@
             const file = document.getElementById("inventoryFile").files[0];
             if (!file) {
               statusDiv.textContent = "请选择要导入的文件";
-              return;
-            }
+            return;
+          }
 
             statusDiv.textContent = "正在读取文件...";
             const data = await readExcelFile(file);
@@ -2046,7 +2046,7 @@
                     store.get("type") === "direct" ? "自营店" : "加盟店";
                   const storeName = store.get("name") || "";
                   const displayStoreName = storeName.replace("食圈儿 ", "");
-                  return `
+                return `
                     <tr>
                       <td>${displayStoreName}</td>
                       <td>${storeType}</td>
@@ -2066,8 +2066,8 @@
                       </td>
                     </tr>
               `;
-                })
-                .join("");
+              })
+              .join("");
             } else {
               // 如果 LeanCloud 没有数据，尝试从 localStorage 获取
               const storesData = localStorage.getItem("stores");
