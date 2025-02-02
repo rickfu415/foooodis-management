@@ -280,10 +280,10 @@
           query.ascending("category"); // 按类别排序
           const products = await query.find();
           window.allProducts = products; // 保存所有商品到全局变量
-          
+
           // 获取所有商品的开店库存
           window.openingStocks = await getOpeningStocks();
-          
+
           filterByCategory(); // 初始显示所有商品
         } catch (error) {
           console.error("加载商品列表失败:", error);
@@ -398,7 +398,7 @@
                     .map(
                       (item) => `
                     <div class="history-product">
-                      <span>${item.productName || "未知商品"}</span>
+                      <span>${item.product || "未知商品"}</span>
                       <span>进货 ${item.quantity}个 ${
                         item.note ? `(${item.note})` : ""
                       }</span>

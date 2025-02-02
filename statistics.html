@@ -205,27 +205,6 @@
     </header>
 
     <div class="container">
-      <!-- 库存概览 -->
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">库存概览</h2>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="category-label">饮品</div>
-            <div class="stat-value" id="drinksStock">-</div>
-            <div class="stat-label">当前库存</div>
-            <div class="inventory-details" id="drinksDetails"></div>
-          </div>
-          <div class="stat-card">
-            <div class="category-label">烘焙</div>
-            <div class="stat-value" id="bakeryStock">-</div>
-            <div class="stat-label">当前库存</div>
-            <div class="inventory-details" id="bakeryDetails"></div>
-          </div>
-        </div>
-      </div>
-
       <!-- 今日销售 -->
       <div class="card">
         <div class="card-header">
@@ -236,11 +215,13 @@
             <div class="category-label">饮品</div>
             <div class="stat-value" id="drinksSold">-</div>
             <div class="stat-label">销售数量</div>
+            <div class="inventory-details" id="drinksSoldDetails"></div>
           </div>
           <div class="stat-card">
             <div class="category-label">烘焙</div>
             <div class="stat-value" id="bakerySold">-</div>
             <div class="stat-label">销售数量</div>
+            <div class="inventory-details" id="bakerySoldDetails"></div>
           </div>
         </div>
       </div>
@@ -285,8 +266,8 @@
 
       // 添加排序状态变量
       let sortConfig = {
-        column: "name",
-        direction: "asc",
+        column: "sales",
+        direction: "desc",
       };
 
       // 添加排序函数
@@ -300,22 +281,16 @@
               bValue = b[1].name;
               break;
             case "category":
-              aValue = a[1].category === "drinks" ? "饮品" : "烘焙";
-              bValue = b[1].category === "drinks" ? "饮品" : "烘焙";
+              aValue = a[1].category;
+              bValue = b[1].category;
               break;
             case "stock":
               aValue = a[1].currentStock;
               bValue = b[1].currentStock;
               break;
             case "sales":
-              aValue = Math.max(
-                0,
-                a[1].openingStock + a[1].restockQuantity - a[1].currentStock
-              );
-              bValue = Math.max(
-                0,
-                b[1].openingStock + b[1].restockQuantity - b[1].currentStock
-              );
+              aValue = a[1].sales;
+              bValue = b[1].sales;
               break;
             default:
               return 0;
@@ -368,6 +343,7 @@
         try {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
           // 获取当前店铺信息
           const storeData = JSON.parse(
@@ -393,18 +369,42 @@
               currentStock: 0,
               openingStock: 0,
               restockQuantity: 0,
+              sales: 0,
+              price: product.get("price"),
+              source: product.get("source") || "未知",
             };
+          });
+
+          // 获取今日销售数据
+          const salesQuery = new AV.Query("DailyProductSales");
+          salesQuery.equalTo("storeName", storeData.name);
+          salesQuery.greaterThanOrEqualTo("date", today);
+          salesQuery.lessThan("date", tomorrow);
+          const salesRecords = await salesQuery.find();
+          console.log("获取到销售记录:", salesRecords.length, "条");
+
+          // 处理销售数据
+          salesRecords.forEach((record) => {
+            const productName = record.get("productName");
+            const quantity = record.get("quantity");
+            const category = record.get("category");
+            const price = record.get("price");
+            const source = record.get("source");
+
+            // 找到对应的商品
+            const product = Object.values(productMap).find(
+              (p) => p.name === productName
+            );
+            if (product) {
+              product.sales += quantity;
+            }
           });
 
           // 获取今日所有盘点记录
           const query = new AV.Query("InventoryCheck");
           query.equalTo("storeId", storeData.id);
           query.greaterThanOrEqualTo("date", today);
-          query.lessThan(
-            "date",
-            new Date(today.getTime() + 24 * 60 * 60 * 1000)
-          );
-          query.include("items.product");
+          query.lessThan("date", tomorrow);
           query.ascending("createdAt");
           const checks = await query.find();
           console.log("获取到盘点记录:", checks.length, "条");
@@ -422,32 +422,23 @@
             );
 
             items.forEach((item) => {
-              if (!item.product || !item.product.id) return;
-              const productId = item.product.id;
-              if (!productMap[productId]) return;
+              // 找到对应的商品
+              const product = Object.values(productMap).find(
+                (p) => p.name === item.product
+              );
+              if (!product) return;
 
               const quantity = item.quantity || 0;
-              console.log(
-                "商品:",
-                productMap[productId].name,
-                "数量:",
-                quantity
-              );
+              console.log("商品:", product.name, "数量:", quantity);
 
               if (checkType === "opening") {
-                // 记录开店盘点数量
-                productMap[productId].openingStock = quantity;
-                productMap[productId].currentStock = quantity;
-                console.log("设置开店库存:", quantity);
+                product.openingStock = quantity;
+                product.currentStock = quantity;
               } else if (checkType === "restocking") {
-                // 累加进货数量
-                productMap[productId].restockQuantity += quantity;
-                productMap[productId].currentStock += quantity;
-                console.log("累加进货数量:", quantity);
+                product.restockQuantity += quantity;
+                product.currentStock += quantity;
               } else if (checkType === "closing") {
-                // 更新当前库存为闭店盘点数量
-                productMap[productId].currentStock = quantity;
-                console.log("更新闭店库存:", quantity);
+                product.currentStock = quantity;
               }
             });
           });
@@ -465,18 +456,12 @@
           // 更新商品明细表格
           const detailsHtml = productEntries
             .map(([id, product]) => {
-              const sales = Math.max(
-                0,
-                product.openingStock +
-                  product.restockQuantity -
-                  product.currentStock
-              );
               return `
                 <tr>
                   <td>${product.name}</td>
-                  <td>${product.category === "drinks" ? "饮品" : "烘焙"}</td>
+                  <td>${product.category}</td>
                   <td>${product.currentStock}</td>
-                  <td>${sales}</td>
+                  <td>${product.sales}</td>
                 </tr>
               `;
             })
@@ -484,40 +469,140 @@
 
           document.getElementById("productDetailsList").innerHTML = detailsHtml;
 
-          // 计算并更新总计数据
-          const totals = Object.values(productMap).reduce(
+          // 计算分品类的销量总和
+          const categoryTotals = Object.values(productMap).reduce(
             (acc, product) => {
-              if (product.category === "drinks") {
-                acc.drinksStock += product.currentStock;
-                acc.drinksSold += Math.max(
-                  0,
-                  product.openingStock +
-                    product.restockQuantity -
-                    product.currentStock
-                );
-              } else if (product.category === "bakery") {
-                acc.bakeryStock += product.currentStock;
-                acc.bakerySold += Math.max(
-                  0,
-                  product.openingStock +
-                    product.restockQuantity -
-                    product.currentStock
-                );
+              if (product.category === "饮品类") {
+                const category =
+                  product.source === "自制" ? "自制饮品" : "外采饮品";
+                if (!acc[category]) {
+                  acc[category] = { quantity: 0, amount: 0 };
+                }
+                acc[category].quantity += product.sales;
+                acc[category].amount += product.sales * product.price;
+              } else if (product.category === "烘焙类") {
+                const category =
+                  product.source === "自制" ? "自制烘焙" : "外采烘焙";
+                if (!acc[category]) {
+                  acc[category] = { quantity: 0, amount: 0 };
+                }
+                acc[category].quantity += product.sales;
+                acc[category].amount += product.sales * product.price;
               }
               return acc;
             },
-            { drinksStock: 0, drinksSold: 0, bakeryStock: 0, bakerySold: 0 }
+            {}
           );
 
-          console.log("统计结果:", totals);
+          // 计算并更新总计数据
+          const totals = Object.values(productMap).reduce(
+            (acc, product) => {
+              if (product.category === "饮品类") {
+                acc.drinksStock += product.currentStock;
+                acc.drinksSold += product.sales;
+              } else if (product.category === "烘焙类") {
+                acc.bakeryStock += product.currentStock;
+                acc.bakerySold += product.sales;
+              }
+              return acc;
+            },
+            {
+              drinksStock: 0,
+              drinksSold: 0,
+              bakeryStock: 0,
+              bakerySold: 0,
+            }
+          );
 
-          // 更新显示
-          document.getElementById("drinksStock").textContent =
-            totals.drinksStock;
-          document.getElementById("bakeryStock").textContent =
-            totals.bakeryStock;
+          // 添加销售金额统计
+          const salesAmount = Object.values(productMap).reduce(
+            (acc, product) => {
+              const amount = product.sales * product.price;
+              if (product.category === "饮品类") {
+                acc.drinksAmount += amount;
+              } else if (product.category === "烘焙类") {
+                acc.bakeryAmount += amount;
+              }
+              return acc;
+            },
+            { drinksAmount: 0, bakeryAmount: 0 }
+          );
+
+          // 更新饮品销售统计
           document.getElementById("drinksSold").textContent = totals.drinksSold;
+          document.getElementById("drinksSoldDetails").innerHTML = `
+            销售金额: ¥${salesAmount.drinksAmount.toFixed(2)}<br>
+            ${
+              categoryTotals["自制饮品"]
+                ? `自制饮品: ${
+                    categoryTotals["自制饮品"].quantity
+                  }件 (¥${categoryTotals["自制饮品"].amount.toFixed(2)})<br>`
+                : ""
+            }
+            ${
+              categoryTotals["外采饮品"]
+                ? `外采饮品: ${
+                    categoryTotals["外采饮品"].quantity
+                  }件 (¥${categoryTotals["外采饮品"].amount.toFixed(2)})`
+                : ""
+            }
+          `;
+
+          // 更新烘焙销售统计
           document.getElementById("bakerySold").textContent = totals.bakerySold;
+          document.getElementById("bakerySoldDetails").innerHTML = `
+            销售金额: ¥${salesAmount.bakeryAmount.toFixed(2)}<br>
+            ${
+              categoryTotals["自制烘焙"]
+                ? `自制烘焙: ${
+                    categoryTotals["自制烘焙"].quantity
+                  }件 (¥${categoryTotals["自制烘焙"].amount.toFixed(2)})<br>`
+                : ""
+            }
+            ${
+              categoryTotals["外采烘焙"]
+                ? `外采烘焙: ${
+                    categoryTotals["外采烘焙"].quantity
+                  }件 (¥${categoryTotals["外采烘焙"].amount.toFixed(2)})`
+                : ""
+            }
+          `;
+
+          // 更新销售金额显示
+          document.getElementById("drinksSoldDetails").innerHTML = `
+            销售金额: ¥${salesAmount.drinksAmount.toFixed(2)}<br>
+            ${
+              categoryTotals["自制饮品"]
+                ? `自制饮品: ${
+                    categoryTotals["自制饮品"].quantity
+                  }件 (¥${categoryTotals["自制饮品"].amount.toFixed(2)})<br>`
+                : ""
+            }
+            ${
+              categoryTotals["外采饮品"]
+                ? `外采饮品: ${
+                    categoryTotals["外采饮品"].quantity
+                  }件 (¥${categoryTotals["外采饮品"].amount.toFixed(2)})`
+                : ""
+            }
+          `;
+          document.getElementById("bakerySoldDetails").innerHTML = `
+            销售金额: ¥${salesAmount.bakeryAmount.toFixed(2)}<br>
+            ${
+              categoryTotals["自制烘焙"]
+                ? `自制烘焙: ${
+                    categoryTotals["自制烘焙"].quantity
+                  }件 (¥${categoryTotals["自制烘焙"].amount.toFixed(2)})<br>`
+                : ""
+            }
+            ${
+              categoryTotals["外采烘焙"]
+                ? `外采烘焙: ${
+                    categoryTotals["外采烘焙"].quantity
+                  }件 (¥${categoryTotals["外采烘焙"].amount.toFixed(2)})`
+                : ""
+            }
+          `;
         } catch (error) {
           console.error("获取库存数据失败:", error);
         }

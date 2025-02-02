@@ -532,7 +532,7 @@
               <td>${category}</td>
               <td>${price}元</td>
               <td>${name}</td>
-              <td><input type="number" min="0" class="loss-count" /></td>
+              <td><input type="number" min="0" class="loss-count" onchange="moveToNext(this)" /></td>
               <td>
                 <select class="loss-reason">
                   <option value="">选择原因...</option>
@@ -549,6 +549,18 @@
 
         console.log("渲染商品数量:", products.length);
         lossProductList.innerHTML = productsHtml;
+      }
+
+      // 添加自动跳转到下一个输入框的功能
+      function moveToNext(currentInput) {
+        const currentRow = currentInput.closest("tr");
+        const nextRow = currentRow.nextElementSibling;
+        if (nextRow) {
+          const nextInput = nextRow.querySelector(".loss-count");
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }
       }
 
       // 移除已选商品

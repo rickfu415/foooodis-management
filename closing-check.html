@@ -279,7 +279,12 @@
           if (openingCheck) {
             const items = openingCheck.get("items") || [];
             items.forEach((item) => {
-              stockMap[item.product] = item.quantity;
+              stockMap[item.product] = {
+                opening: item.quantity,
+                restocking: 0,
+                loss: 0,
+                total: item.quantity,
+              };
             });
           }
 
@@ -287,8 +292,16 @@
           restockingChecks.forEach((check) => {
             const items = check.get("items") || [];
             items.forEach((item) => {
-              stockMap[item.product] =
-                (stockMap[item.product] || 0) + item.quantity;
+              if (!stockMap[item.product]) {
+                stockMap[item.product] = {
+                  opening: 0,
+                  restocking: 0,
+                  loss: 0,
+                  total: 0,
+                };
+              }
+              stockMap[item.product].restocking += item.quantity;
+              stockMap[item.product].total += item.quantity;
             });
           });
 
@@ -296,8 +309,16 @@
           lossChecks.forEach((check) => {
             const items = check.get("items") || [];
             items.forEach((item) => {
-              stockMap[item.product] =
-                (stockMap[item.product] || 0) - item.quantity;
+              if (!stockMap[item.product]) {
+                stockMap[item.product] = {
+                  opening: 0,
+                  restocking: 0,
+                  loss: 0,
+                  total: 0,
+                };
+              }
+              stockMap[item.product].loss += item.quantity;
+              stockMap[item.product].total -= item.quantity;
             });
           });
 
@@ -331,12 +352,17 @@
           const productRows = products.map((product) => {
             const name = product.get("name");
             const category = product.get("category");
-            const stock = stockMap[name] || 0;
+            const stock = stockMap[name] || {
+              opening: 0,
+              restocking: 0,
+              loss: 0,
+              total: 0,
+            };
 
             return `
               <tr data-id="${product.id}">
                 <td>${category}</td>
-                <td>${stock}</td>
+                <td style="white-space: nowrap;">${stock.opening} + ${stock.restocking} - ${stock.loss} = ${stock.total}</td>
                 <td>${name}</td>
                 <td><input type="number" inputmode="numeric" pattern="[0-9]*" min="0" class="stock-count" onchange="moveToNext(this)" /></td>
               </tr>
@@ -399,7 +425,6 @@
             return;
           }
 
-          // 显示历史记录
           historyElement.innerHTML = checks
             .map((check) => {
               const date = check.get("date");
@@ -424,7 +449,9 @@
                       (item) => `
                     <div class="history-product">
                       <span>${item.product || "未知商品"}</span>
-                      <span>${item.quantity}个</span>
+                      <span>${
+                        item.quantity === 0 ? "0" : item.quantity
+                      }个</span>
                     </div>
                   `
                     )
@@ -435,7 +462,7 @@
             })
             .join("");
 
-          // 使用最新的闭店盘点记录计算销量
+          // 使用最新的闭店盘点记录重新计算销量
           const latestCheck = checks[0];
           await calculateSales(latestCheck.get("items"));
         } catch (error) {
@@ -459,23 +486,44 @@
             return;
           }
 
-          // 获取当前用户
-          const currentUser = AV.User.current();
-          if (!currentUser) {
-            console.error("未登录");
-            return;
-          }
+          // 获取所有商品信息，用于获取类别和单价
+          const productQuery = new AV.Query("Product");
+          const products = await productQuery.find();
+          const productMap = {};
+          products.forEach((product) => {
+            productMap[product.get("name")] = {
+              category: product.get("category"),
+              price: product.get("price"),
+              source: product.get("source") || "未知",
+            };
+          });
 
           // 遍历闭店盘点的商品
           closingItems.forEach((item) => {
-            const currentStock = stockMap[item.product] || 0;
+            const stock = stockMap[item.product] || {
+              opening: 0,
+              restocking: 0,
+              loss: 0,
+              total: 0,
+            };
+            const currentStock = stock.total;
             const closingStock = item.quantity;
             const sales = currentStock - closingStock;
 
             if (sales > 0) {
+              const productInfo = productMap[item.product] || {
+                category: "未知",
+                price: 0,
+                source: "未知",
+              };
               salesList.push({
+                category: productInfo.category,
+                date: new Date().toLocaleDateString("zh-CN"),
+                price: productInfo.price,
                 product: item.product,
                 sales: sales,
+                source: productInfo.source,
+                storeName: storeData.name,
               });
             }
           });
@@ -491,56 +539,102 @@
           }
 
           salesElement.innerHTML = `
-            <div class="history-content">
-              ${salesList
-                .map(
-                  (item) => `
-                <div class="history-product">
-                  <span>${item.product}</span>
-                  <span>销售 ${item.sales} 个</span>
-                </div>
-              `
-                )
-                .join("")}
-            </div>
+            <table class="inventory-table">
+              <thead>
+                <tr>
+                  <th>类别</th>
+                  <th>日期</th>
+                  <th>单价</th>
+                  <th>商品名</th>
+                  <th>销量</th>
+                  <th>来源</th>
+                  <th>店铺名</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${salesList
+                  .map(
+                    (item) => `
+                  <tr>
+                    <td>${item.category}</td>
+                    <td>${item.date}</td>
+                    <td>¥${item.price.toFixed(2)}</td>
+                    <td>${item.product}</td>
+                    <td>${item.sales}</td>
+                    <td>${item.source}</td>
+                    <td>${item.storeName}</td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
           `;
 
-          // 保存销量数据到 DailyProductSales 表
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+          // 上传销售数据到 DailyProductSales
+          try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-          // 先检查今天是否已经有销量记录
-          const query = new AV.Query("DailyProductSales");
-          query.equalTo("storeId", storeData.id);
-          query.greaterThanOrEqualTo("date", today);
-          query.lessThan(
-            "date",
-            new Date(today.getTime() + 24 * 60 * 60 * 1000)
-          );
-          const existingSales = await query.first();
+            // 准备销售数据，按照 DailyProductSales 类的字段格式
+            const formattedSalesList = salesList.map((item) => ({
+              category: item.category,
+              date: today,
+              price: item.price,
+              productName: item.product,
+              quantity: item.sales,
+              source: item.source,
+              storeName: item.storeName,
+            }));
 
-          if (existingSales) {
-            // 更新现有记录
-            existingSales.set("items", salesList);
-            await existingSales.save();
-          } else {
-            // 创建新记录
+            // 创建并保存所有销售记录，检查重复
             const DailyProductSales = AV.Object.extend("DailyProductSales");
-            const salesRecord = new DailyProductSales();
 
-            salesRecord.set("date", today);
-            salesRecord.set("items", salesList);
-            salesRecord.set("storeId", storeData.id);
-            salesRecord.set("storeName", storeData.name);
-            salesRecord.set("operator", currentUser);
-            salesRecord.set("status", "submitted");
+            // 对每条销售记录进行查重和保存
+            const savePromises = formattedSalesList.map(async (sale) => {
+              // 构建查询条件：相同日期、店铺名和商品名
+              const query = new AV.Query("DailyProductSales");
+              query.equalTo("date", sale.date);
+              query.equalTo("storeName", sale.storeName);
+              query.equalTo("productName", sale.productName);
 
-            await salesRecord.save();
+              // 检查是否已存在记录
+              const existingRecord = await query.first();
+
+              if (!existingRecord) {
+                // 如果不存在，创建新记录
+                const salesRecord = new DailyProductSales();
+                salesRecord.set("category", sale.category);
+                salesRecord.set("date", sale.date);
+                salesRecord.set("price", sale.price);
+                salesRecord.set("productName", sale.productName);
+                salesRecord.set("quantity", sale.quantity);
+                salesRecord.set("source", sale.source);
+                salesRecord.set("storeName", sale.storeName);
+                return salesRecord.save();
+              } else {
+                console.log(
+                  `跳过重复记录: ${sale.productName} at ${sale.storeName}`
+                );
+                return null;
+              }
+            });
+
+            // 等待所有保存操作完成
+            const results = await Promise.all(savePromises);
+            const savedCount = results.filter(
+              (result) => result !== null
+            ).length;
+            console.log(
+              `成功上传 ${savedCount} 条销售数据，跳过 ${
+                results.length - savedCount
+              } 条重复数据`
+            );
+          } catch (error) {
+            console.error("上传销售数据失败:", error);
           }
-
-          console.log("销量数据已保存到数据库");
         } catch (error) {
-          console.error("计算或保存销量失败:", error);
+          console.error("计算销量失败:", error);
         }
       }
 
@@ -570,16 +664,16 @@
 
           // 收集表单数据
           document.querySelectorAll("#inventoryList tr").forEach((row) => {
-            const quantity =
-              parseInt(row.querySelector(".stock-count").value) || 0;
+            const input = row.querySelector(".stock-count");
             const productName =
               row.querySelector("td:nth-child(3)").textContent;
 
-            if (quantity > 0) {
+            // 检查输入框是否有值（包括0）
+            if (input.value !== "") {
               hasItems = true;
               items.push({
                 product: productName,
-                quantity: quantity,
+                quantity: parseInt(input.value),
               });
             }
           });
@@ -613,7 +707,7 @@
 
           alert("闭店盘点提交成功！");
 
-          // 重新加载历史记录和销量统计
+          // 重新加载历史记录（这会同时更新销量统计）
           await loadTodayHistory();
 
           // 清空输入框
