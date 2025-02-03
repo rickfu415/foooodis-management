@@ -29,6 +29,32 @@
         align-items: center;
       }
 
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #666;
+        font-size: 14px;
+      }
+
+      .user-info .name {
+        font-weight: bold;
+        color: #333;
+      }
+
+      .user-info .role {
+        background-color: #e9ecef;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
+
       .btn {
         padding: 8px 16px;
         border: none;
@@ -264,6 +290,52 @@
         height: 300px;
         width: 100%;
       }
+
+      .filter-content {
+        display: flex;
+        gap: 20px;
+        align-items: flex-end;
+        padding: 15px;
+      }
+
+      .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        flex: 1;
+      }
+
+      .filter-item label {
+        font-size: 14px;
+        color: #666;
+      }
+
+      .filter-select {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        width: 200px;
+      }
+
+      .filter-select:hover {
+        border-color: #b3b3b3;
+      }
+
+      .filter-select:focus {
+        border-color: #007bff;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background-color: #0056b3;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
@@ -271,22 +343,50 @@
   </head>
   <body>
     <header class="header">
-      <div>
+      <div class="header-left">
         <a href="select-store.html" class="btn btn-back">返回店铺列表</a>
-      </div>
-      <div class="date-range">
-        <select id="timeRange">
-          <option value="today">今日</option>
-          <option value="yesterday">昨日</option>
-          <option value="last7days">近7天</option>
-          <option value="last30days">近30天</option>
-          <option value="thisMonth">本月</option>
-          <option value="lastMonth">上月</option>
-        </select>
+        <div class="user-info">
+          <span class="name" id="userName">-</span>
+          <span class="role" id="userRole">-</span>
+        </div>
       </div>
     </header>
 
     <div class="container">
+      <!-- 筛选条件 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">数据筛选</h2>
+        </div>
+        <div class="filter-content">
+          <div class="filter-item">
+            <label>时间范围</label>
+            <select
+              id="timeRange"
+              class="filter-select"
+              onchange="applyFilters()"
+            >
+              <option value="today">今日</option>
+              <option value="yesterday">昨日</option>
+              <option value="last7days">近7天</option>
+              <option value="last30days">近30天</option>
+              <option value="thisMonth">本月</option>
+              <option value="lastMonth">上月</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>选择店铺</label>
+            <select
+              id="storeFilter"
+              class="filter-select"
+              onchange="applyFilters()"
+            >
+              <!-- 店铺选项将通过JavaScript动态生成 -->
+            </select>
+          </div>
+        </div>
+      </div>
+
       <!-- 关键指标统计 -->
       <div class="card">
         <div class="card-header">
@@ -329,9 +429,6 @@
             <div id="categorySalesPie" class="pie-chart"></div>
             <div id="categoryQuantityPie" class="pie-chart"></div>
           </div>
-          <div id="categoryStats">
-            <!-- 类别统计将通过JavaScript动态生成 -->
-          </div>
         </div>
       </div>
 
@@ -371,6 +468,16 @@
           window.location.href = "index.html";
           return;
         }
+
+        // 更新用户信息显示
+        const userData = JSON.parse(localStorage.getItem("user"));
+        if (userData) {
+          document.getElementById("userName").textContent =
+            userData.name || currentUser.get("username");
+          document.getElementById("userRole").textContent =
+            userData.role === "admin" ? "管理员" : "店员";
+        }
+
         return currentUser;
       }
 
@@ -403,8 +510,8 @@
       }
 
       // 获取销售数据
-      async function fetchDailyProductSales(timeRange) {
-        const query = new AV.Query("DailyProductSales");
+      async function fetchDailyProductSales(timeRange, selectedStore = "all") {
+        let query = new AV.Query("DailyProductSales");
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -438,13 +545,29 @@
 
         query.greaterThanOrEqualTo("date", startDate);
         query.lessThan("date", endDate);
+
+        // 添加店铺筛选
+        if (selectedStore !== "all") {
+          // 创建两个查询条件：完全匹配和带品牌前缀匹配
+          const exactQuery = new AV.Query("DailyProductSales");
+          exactQuery.equalTo("storeName", selectedStore);
+          exactQuery.greaterThanOrEqualTo("date", startDate);
+          exactQuery.lessThan("date", endDate);
+
+          const prefixQuery = new AV.Query("DailyProductSales");
+          prefixQuery.equalTo("storeName", "食圈儿 " + selectedStore);
+          prefixQuery.greaterThanOrEqualTo("date", startDate);
+          prefixQuery.lessThan("date", endDate);
+
+          // 合并两个查询条件（OR）
+          query = AV.Query.or(exactQuery, prefixQuery);
+        }
+
         query.select([
           "productName",
           "quantity",
-          "price",
           "storeName",
           "category",
-          "source",
           "date",
         ]);
         query.limit(1000);
@@ -452,9 +575,106 @@
         return await query.find();
       }
 
+      // 获取商品价格信息
+      async function fetchProductPrices() {
+        const query = new AV.Query("Product");
+        query.select(["name", "price", "category", "source"]);
+        query.limit(1000);
+        const products = await query.find();
+
+        // 创建商品价格和类别映射
+        const productMap = new Map();
+        products.forEach((product) => {
+          productMap.set(product.get("name"), {
+            price: product.get("price") || 0,
+            category: product.get("category"),
+            source: product.get("source") || "自制", // 默认为自制
+          });
+        });
+        return productMap;
+      }
+
+      // 计算统计数据
+      async function calculateStatistics(salesData) {
+        // 获取商品价格信息
+        const productPrices = await fetchProductPrices();
+
+        const stats = {
+          totalSales: 0,
+          totalOrders: 0,
+          avgOrderValue: 0,
+          storeRankings: {},
+          productRankings: {},
+          categoryStats: {
+            饮品类: { quantity: 0, amount: 0 },
+            烘焙类: { quantity: 0, amount: 0 },
+          },
+        };
+
+        // 计算总销售额和各种统计
+        salesData.forEach((record) => {
+          const quantity = record.get("quantity");
+          const productName = record.get("productName");
+          const storeName = record.get("storeName");
+
+          // 跳过包装袋的统计
+          if (productName === "包装袋") {
+            return;
+          }
+
+          // 从商品映射中获取价格和类别
+          const productInfo = productPrices.get(productName) || {
+            price: 0,
+            category: "未知",
+          };
+          const amount = quantity * productInfo.price;
+          const category = productInfo.category;
+
+          // 累计总销售额和总订单数
+          stats.totalSales += amount;
+          stats.totalOrders += quantity;
+
+          // 按类别统计
+          if (stats.categoryStats[category]) {
+            stats.categoryStats[category].quantity += quantity;
+            stats.categoryStats[category].amount += amount;
+          }
+
+          // 统计店铺销售额
+          if (!stats.storeRankings[storeName]) {
+            stats.storeRankings[storeName] = {
+              totalSales: 0,
+              orderCount: 0,
+            };
+          }
+          stats.storeRankings[storeName].totalSales += amount;
+          stats.storeRankings[storeName].orderCount += quantity;
+
+          // 统计商品销量
+          if (!stats.productRankings[productName]) {
+            stats.productRankings[productName] = {
+              quantity: 0,
+              totalSales: 0,
+              category: category,
+            };
+          }
+          stats.productRankings[productName].quantity += quantity;
+          stats.productRankings[productName].totalSales += amount;
+        });
+
+        // 计算平均客单价
+        stats.avgOrderValue =
+          stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0;
+
+        return stats;
+      }
+
       // 获取环比数据
-      async function fetchComparisonData(timeRange) {
-        const currentData = await fetchDailyProductSales(timeRange);
+      async function fetchComparisonData(timeRange, selectedStore = "all") {
+        const currentData = await fetchDailyProductSales(
+          timeRange,
+          selectedStore
+        );
         let previousData;
 
         const today = new Date();
@@ -463,7 +683,10 @@
         switch (timeRange) {
           case "today":
           case "yesterday":
-            previousData = await fetchDailyProductSales("yesterday");
+            previousData = await fetchDailyProductSales(
+              "yesterday",
+              selectedStore
+            );
             break;
           case "last7days":
             const previous7Start = new Date(
@@ -475,6 +698,9 @@
             const query = new AV.Query("DailyProductSales");
             query.greaterThanOrEqualTo("date", previous7Start);
             query.lessThan("date", previous7End);
+            if (selectedStore !== "all") {
+              query.equalTo("storeName", selectedStore);
+            }
             previousData = await query.find();
             break;
           case "last30days":
@@ -487,6 +713,9 @@
             const query30 = new AV.Query("DailyProductSales");
             query30.greaterThanOrEqualTo("date", previous30Start);
             query30.lessThan("date", previous30End);
+            if (selectedStore !== "all") {
+              query30.equalTo("storeName", selectedStore);
+            }
             previousData = await query30.find();
             break;
           case "thisMonth":
@@ -503,13 +732,19 @@
             const queryMonth = new AV.Query("DailyProductSales");
             queryMonth.greaterThanOrEqualTo("date", lastMonthStart);
             queryMonth.lessThan("date", lastMonthEnd);
+            if (selectedStore !== "all") {
+              queryMonth.equalTo("storeName", selectedStore);
+            }
             previousData = await queryMonth.find();
             break;
         }
 
+        const current = await calculateStatistics(currentData);
+        const previous = await calculateStatistics(previousData || []);
+
         return {
-          current: calculateStatistics(currentData),
-          previous: calculateStatistics(previousData || []),
+          current,
+          previous,
           currentData,
           previousData: previousData || [],
         };
@@ -540,34 +775,90 @@
       }
 
       // 更新销售趋势图表
-      function updateSalesTrendChart(chart, currentData, previousData) {
+      async function updateSalesTrendChart(chart, currentData, previousData) {
+        // 获取商品价格信息
+        const productPrices = await fetchProductPrices();
+
         const dates = [];
-        const salesData = [];
-        const ordersData = [];
+        const categoryData = {
+          "饮品类-自制": {},
+          "饮品类-老广": {},
+          烘焙类: {},
+        };
 
-        // 按日期分组当前数据
-        const groupedData = currentData.reduce((acc, record) => {
+        // 按日期和类别分组数据
+        currentData.forEach((record) => {
           const date = dayjs(record.get("date")).format("YYYY-MM-DD");
-          if (!acc[date]) {
-            acc[date] = {
-              sales: 0,
-              orders: 0,
-            };
-          }
-          const amount = record.get("quantity") * record.get("price");
-          acc[date].sales += amount;
-          acc[date].orders += record.get("quantity");
-          return acc;
-        }, {});
+          const quantity = record.get("quantity");
+          const productName = record.get("productName");
 
-        // 生成图表数据
-        Object.entries(groupedData)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .forEach(([date, data]) => {
+          // 跳过包装袋的统计
+          if (productName === "包装袋") {
+            return;
+          }
+
+          const productInfo = productPrices.get(productName) || {
+            category: "未知",
+            source: "自制",
+          };
+
+          if (!dates.includes(date)) {
             dates.push(date);
-            salesData.push(data.sales.toFixed(2));
-            ordersData.push(data.orders);
-          });
+          }
+
+          // 处理饮品类的不同来源
+          if (productInfo.category === "饮品类") {
+            const key =
+              productInfo.source === "老广" ? "饮品类-老广" : "饮品类-自制";
+            if (!categoryData[key][date]) {
+              categoryData[key][date] = 0;
+            }
+            categoryData[key][date] += quantity;
+          }
+          // 处理烘焙类
+          else if (productInfo.category === "烘焙类") {
+            if (!categoryData["烘焙类"][date]) {
+              categoryData["烘焙类"][date] = 0;
+            }
+            categoryData["烘焙类"][date] += quantity;
+          }
+        });
+
+        // 排序日期
+        dates.sort();
+
+        // 生成数据系列
+        const series = [
+          {
+            name: "饮品类-自制",
+            type: "bar",
+            stack: "drinks",
+            data: dates.map((date) => categoryData["饮品类-自制"][date] || 0),
+            itemStyle: { color: "#91cc75" }, // 浅绿色
+            emphasis: {
+              focus: "series",
+            },
+          },
+          {
+            name: "饮品类-老广",
+            type: "bar",
+            stack: "drinks",
+            data: dates.map((date) => categoryData["饮品类-老广"][date] || 0),
+            itemStyle: { color: "#5470c6" }, // 蓝色
+            emphasis: {
+              focus: "series",
+            },
+          },
+          {
+            name: "烘焙类",
+            type: "bar",
+            data: dates.map((date) => categoryData["烘焙类"][date] || 0),
+            itemStyle: { color: "#fac858" }, // 黄色
+            emphasis: {
+              focus: "series",
+            },
+          },
+        ];
 
         const option = {
           tooltip: {
@@ -575,21 +866,40 @@
             className: "echarts-tooltip",
             formatter: function (params) {
               let html = `<div class="echarts-tooltip-title">${params[0].axisValue}</div>`;
+              let drinkTotal = 0;
+
               params.forEach((param) => {
-                const value =
-                  param.seriesName === "销售额"
-                    ? formatCurrency(param.value)
-                    : param.value + "件";
-                html += `<div class="echarts-tooltip-item">
-                  <span>${param.seriesName}:</span>
-                  <span>${value}</span>
-                </div>`;
+                if (param.value > 0) {
+                  html += `<div class="echarts-tooltip-item">
+                    <span>${param.seriesName}:</span>
+                    <span>${param.value}件</span>
+                  </div>`;
+
+                  // 计算饮品类总计
+                  if (param.seriesName.startsWith("饮品类")) {
+                    drinkTotal += param.value;
+                  }
+                }
               });
+
+              // 如果有饮品类销售，显示饮品类总计
+              if (drinkTotal > 0) {
+                html += `<div class="echarts-tooltip-item" style="margin-top:5px;color:#666">
+                  <span>饮品类总计:</span>
+                  <span>${drinkTotal}件</span>
+                </div>`;
+              }
+
               return html;
             },
           },
           legend: {
-            data: ["销售额", "销售量"],
+            data: ["饮品类-自制", "饮品类-老广", "烘焙类"],
+            selected: {
+              "饮品类-自制": true,
+              "饮品类-老广": true,
+              烘焙类: true,
+            },
           },
           grid: {
             left: "3%",
@@ -599,113 +909,23 @@
           },
           xAxis: {
             type: "category",
-            boundaryGap: false,
             data: dates,
+            axisLabel: {
+              interval: 0,
+              rotate: 30,
+            },
           },
-          yAxis: [
-            {
-              type: "value",
-              name: "销售额",
-              axisLabel: {
-                formatter: (value) => "¥" + value,
-              },
+          yAxis: {
+            type: "value",
+            name: "销售量",
+            axisLabel: {
+              formatter: "{value}件",
             },
-            {
-              type: "value",
-              name: "销售量",
-              axisLabel: {
-                formatter: "{value}件",
-              },
-            },
-          ],
-          series: [
-            {
-              name: "销售额",
-              type: "line",
-              smooth: true,
-              data: salesData,
-              itemStyle: {
-                color: "#007bff",
-              },
-            },
-            {
-              name: "销售量",
-              type: "line",
-              smooth: true,
-              yAxisIndex: 1,
-              data: ordersData,
-              itemStyle: {
-                color: "#28a745",
-              },
-            },
-          ],
+          },
+          series: series,
         };
 
-        chart.setOption(option);
-      }
-
-      // 计算统计数据
-      function calculateStatistics(salesData) {
-        const stats = {
-          totalSales: 0,
-          totalOrders: 0,
-          avgOrderValue: 0,
-          storeRankings: {},
-          productRankings: {},
-          // 添加类别统计
-          categoryStats: {
-            饮品类: { quantity: 0, amount: 0 },
-            烘焙类: { quantity: 0, amount: 0 },
-          },
-        };
-
-        // 计算总销售额和各种统计
-        salesData.forEach((record) => {
-          const quantity = record.get("quantity");
-          const price = record.get("price");
-          const amount = quantity * price;
-          const storeName = record.get("storeName");
-          const productName = record.get("productName");
-          const category = record.get("category");
-
-          // 累计总销售额和总订单数
-          stats.totalSales += amount;
-          stats.totalOrders += quantity;
-
-          // 按类别统计
-          if (stats.categoryStats[category]) {
-            stats.categoryStats[category].quantity += quantity;
-            stats.categoryStats[category].amount += amount;
-          }
-
-          // 统计店铺销售额
-          if (!stats.storeRankings[storeName]) {
-            stats.storeRankings[storeName] = {
-              totalSales: 0,
-              orderCount: 0,
-            };
-          }
-          stats.storeRankings[storeName].totalSales += amount;
-          stats.storeRankings[storeName].orderCount += quantity;
-
-          // 统计商品销量
-          if (!stats.productRankings[productName]) {
-            stats.productRankings[productName] = {
-              quantity: 0,
-              totalSales: 0,
-              category: category,
-              source: record.get("source"),
-            };
-          }
-          stats.productRankings[productName].quantity += quantity;
-          stats.productRankings[productName].totalSales += amount;
-        });
-
-        // 计算平均客单价
-        stats.avgOrderValue =
-          stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0;
-
-        return stats;
+        chart.setOption(option, true);
       }
 
       // 更新类别统计饼图
@@ -803,21 +1023,6 @@
           salesPieChart.resize();
           quantityPieChart.resize();
         });
-
-        // 更新详细数据卡片
-        document.getElementById("categoryStats").innerHTML = Object.entries(
-          stats.categoryStats
-        )
-          .map(
-            ([category, data]) => `
-            <div class="stat-card">
-              <div class="stat-title">${category}</div>
-              <div class="stat-value">${data.quantity}件</div>
-              <div class="stat-amount">${formatCurrency(data.amount)}</div>
-            </div>
-          `
-          )
-          .join("");
       }
 
       // 更新统计显示
@@ -875,7 +1080,6 @@
               <span class="rank">${index + 1}</span>
               <span class="store-name">${product}</span>
               <span class="category">${data.category}</span>
-              <span class="source">${data.source}</span>
               <span class="sales">${formatCurrency(data.totalSales)}</span>
               <span class="orders">${data.quantity}件</span>
             </div>
@@ -887,9 +1091,25 @@
           productRankingsHtml;
 
         // 更新店铺排行
-        const storeRankings = Object.entries(stats.storeRankings).sort(
-          (a, b) => b[1].totalSales - a[1].totalSales
-        );
+        const storeRankings = Object.entries(stats.storeRankings)
+          .map(([store, data]) => ({
+            // 统一处理店铺名，去除品牌前缀
+            name: store.replace("食圈儿 ", ""),
+            ...data,
+          }))
+          // 合并同名店铺的数据
+          .reduce((acc, curr) => {
+            const existing = acc.find((item) => item.name === curr.name);
+            if (existing) {
+              existing.totalSales += curr.totalSales;
+              existing.orderCount += curr.orderCount;
+            } else {
+              acc.push(curr);
+            }
+            return acc;
+          }, [])
+          // 按销售额排序
+          .sort((a, b) => b.totalSales - a.totalSales);
 
         if (storeRankings.length === 0) {
           showEmpty("storeRankings", "暂无店铺销售数据");
@@ -898,10 +1118,10 @@
 
         const storeRankingsHtml = storeRankings
           .map(
-            ([store, data], index) => `
+            (data, index) => `
             <div class="ranking-item">
               <span class="rank">${index + 1}</span>
-              <span class="store-name">${store}</span>
+              <span class="store-name">${data.name}</span>
               <span class="sales">${formatCurrency(data.totalSales)}</span>
               <span class="orders">${data.orderCount}件</span>
             </div>
@@ -913,7 +1133,7 @@
       }
 
       // 更新统计数据
-      async function updateStatistics(timeRange) {
+      async function updateStatistics(timeRange, selectedStore = "all") {
         try {
           // 显示加载状态
           showLoading("storeRankings");
@@ -921,14 +1141,14 @@
 
           // 获取销售数据和环比数据
           const { current, previous, currentData, previousData } =
-            await fetchComparisonData(timeRange);
+            await fetchComparisonData(timeRange, selectedStore);
 
           // 更新显示
           updateStatisticsDisplay(current, previous);
 
           // 更新趋势图表
           const chart = initSalesTrendChart();
-          updateSalesTrendChart(chart, currentData, previousData);
+          await updateSalesTrendChart(chart, currentData, previousData);
 
           // 监听窗口大小变化，调整图表大小
           window.addEventListener("resize", () => {
@@ -941,18 +1161,46 @@
         }
       }
 
+      // 加载店铺列表
+      async function loadStoreOptions() {
+        try {
+          const query = new AV.Query("Store");
+          const stores = await query.find();
+          const storeFilter = document.getElementById("storeFilter");
+          storeFilter.innerHTML = ""; // 清空现有选项
+
+          // 添加"全部店铺"选项
+          const allOption = new Option("全部店铺", "all");
+          storeFilter.add(allOption);
+
+          // 添加各个店铺选项，存储原始名称但显示简化名称
+          stores.forEach((store) => {
+            const fullName = store.get("name");
+            const displayName = fullName.replace("食圈儿 ", "");
+            const option = new Option(displayName, displayName); // 使用简化名称作为值
+            storeFilter.add(option);
+          });
+        } catch (error) {
+          console.error("加载店铺列表失败:", error);
+        }
+      }
+
+      // 应用筛选条件
+      async function applyFilters() {
+        const timeRange = document.getElementById("timeRange").value;
+        const storeFilter = document.getElementById("storeFilter");
+        const selectedStore = storeFilter.value;
+
+        // 更新统计数据
+        await updateStatistics(timeRange, selectedStore);
+      }
+
       // 页面加载时执行
       window.onload = async function () {
         await checkLogin();
+        await loadStoreOptions();
         updateStatistics("today"); // 默认显示今日数据
       };
-
-      // 时间范围变化处理
-      document
-        .getElementById("timeRange")
-        .addEventListener("change", function (e) {
-          updateStatistics(e.target.value);
-        });
     </script>
   </body>
 </html>
