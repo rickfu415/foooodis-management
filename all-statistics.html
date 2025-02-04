@@ -253,9 +253,20 @@
 
       /* 加载状态样式 */
       .loading {
-        text-align: center;
-        padding: 20px;
-        color: #666;
+        position: relative;
+      }
+
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
       }
 
       .error-message {
@@ -368,8 +379,9 @@
             >
               <option value="today">今日</option>
               <option value="yesterday">昨日</option>
-              <option value="last7days">近7天</option>
-              <option value="last30days">近30天</option>
+              <option value="last7days">过去7天</option>
+              <option value="last15days">过去15天</option>
+              <option value="last30days">过去30天</option>
               <option value="thisMonth">本月</option>
               <option value="lastMonth">上月</option>
             </select>
@@ -387,12 +399,12 @@
         </div>
       </div>
 
-      <!-- 关键指标统计 -->
+      <!-- 关键指标 -->
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">关键指标</h2>
         </div>
-        <div class="stats-grid">
+        <div id="keyMetrics" class="stats-grid">
           <div class="stat-card">
             <div class="stat-value" id="totalSales">-</div>
             <div class="stat-label">总销售额</div>
@@ -491,9 +503,51 @@
 
       // 工具函数：显示加载状态
       function showLoading(elementId) {
-        document.getElementById(elementId).innerHTML =
-          '<div class="loading">加载中...</div>';
+        const element = document.getElementById(elementId);
+        // 保存原有的内容结构，只是添加加载状态的样式
+        if (element) {
+          element.classList.add("loading");
+          if (!element.querySelector(".loading-overlay")) {
+            const overlay = document.createElement("div");
+            overlay.className = "loading-overlay";
+            overlay.innerHTML = '<div class="loading">加载中...</div>';
+            element.appendChild(overlay);
+          }
+        }
       }
+
+      // 工具函数：隐藏加载状态
+      function hideLoading(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.classList.remove("loading");
+          const overlay = element.querySelector(".loading-overlay");
+          if (overlay) {
+            overlay.remove();
+          }
+        }
+      }
+
+      // 添加必要的CSS样式
+      const style = document.createElement("style");
+      style.textContent = `
+        .loading {
+          position: relative;
+        }
+        .loading-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(255, 255, 255, 0.8);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+      `;
+      document.head.appendChild(style);
 
       // 工具函数：显示错误信息
       function showError(elementId, message) {
@@ -509,95 +563,202 @@
         ).innerHTML = `<div class="empty-message">${message}</div>`;
       }
 
-      // 获取销售数据
-      async function fetchDailyProductSales(timeRange, selectedStore = "all") {
-        let query = new AV.Query("DailyProductSales");
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+      // 数据缓存
+      const dataCache = {
+        sales: new Map(), // 存储销售数据
+        products: null, // 存储商品信息
+        cacheTimeout: 5 * 60 * 1000, // 缓存过期时间：5分钟
+      };
 
-        let startDate, endDate;
-        switch (timeRange) {
-          case "today":
-            startDate = today;
-            endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-            break;
-          case "yesterday":
-            startDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-            endDate = today;
-            break;
-          case "last7days":
-            startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-            endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-            break;
-          case "last30days":
-            startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-            endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-            break;
-          case "thisMonth":
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-            endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-            break;
-          case "lastMonth":
-            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-            endDate = new Date(today.getFullYear(), today.getMonth(), 1);
-            break;
-        }
-
-        query.greaterThanOrEqualTo("date", startDate);
-        query.lessThan("date", endDate);
-
-        // 添加店铺筛选
-        if (selectedStore !== "all") {
-          // 创建两个查询条件：完全匹配和带品牌前缀匹配
-          const exactQuery = new AV.Query("DailyProductSales");
-          exactQuery.equalTo("storeName", selectedStore);
-          exactQuery.greaterThanOrEqualTo("date", startDate);
-          exactQuery.lessThan("date", endDate);
-
-          const prefixQuery = new AV.Query("DailyProductSales");
-          prefixQuery.equalTo("storeName", "食圈儿 " + selectedStore);
-          prefixQuery.greaterThanOrEqualTo("date", startDate);
-          prefixQuery.lessThan("date", endDate);
-
-          // 合并两个查询条件（OR）
-          query = AV.Query.or(exactQuery, prefixQuery);
-        }
-
-        query.select([
-          "productName",
-          "quantity",
-          "storeName",
-          "category",
-          "date",
-        ]);
-        query.limit(1000);
-        query.addAscending("date");
-        return await query.find();
+      // 生成缓存key
+      function generateCacheKey(timeRange, store) {
+        return `${timeRange}_${store}`;
       }
 
-      // 获取商品价格信息
+      // 检查缓存是否有效
+      function isCacheValid(cacheEntry) {
+        if (!cacheEntry) return false;
+        return Date.now() - cacheEntry.timestamp < dataCache.cacheTimeout;
+      }
+
+      // 获取销售数据（带缓存）
+      async function fetchDailyProductSales(timeRange, selectedStore = "all") {
+        const cacheKey = generateCacheKey(timeRange, selectedStore);
+        const cachedData = dataCache.sales.get(cacheKey);
+
+        // 如果缓存有效，直接返回缓存数据
+        if (isCacheValid(cachedData)) {
+          console.log("Using cached data for:", cacheKey);
+          return cachedData.data;
+        }
+
+        // 如果缓存无效或不存在，重新获取数据
+        console.log("Fetching fresh data for:", cacheKey);
+        let allResults = [];
+        let skip = 0;
+        const limit = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          let query = new AV.Query("DailyProductSales");
+
+          // 设置日期范围时只考虑年月日
+          const today = new Date();
+          const todayStr = today.toISOString().split("T")[0];
+          today.setHours(0, 0, 0, 0);
+
+          let startDate, endDate;
+          switch (timeRange) {
+            case "today":
+              startDate = new Date(todayStr);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "yesterday":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 1);
+              endDate = new Date(todayStr);
+              break;
+            case "last7days":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 7);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "last15days":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 15);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "last30days":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 30);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "thisMonth":
+              startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "lastMonth":
+              startDate = new Date(
+                today.getFullYear(),
+                today.getMonth() - 1,
+                1
+              );
+              endDate = new Date(today.getFullYear(), today.getMonth(), 1);
+              break;
+          }
+
+          // 确保开始和结束日期都设置为当地时间的0点
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(0, 0, 0, 0);
+
+          query.greaterThanOrEqualTo("date", startDate);
+          query.lessThan("date", endDate);
+
+          // 添加店铺筛选
+          if (selectedStore !== "all") {
+            // 创建三个查询条件
+            const exactQuery = new AV.Query("DailyProductSales");
+            exactQuery.equalTo("storeName", selectedStore);
+            exactQuery.greaterThanOrEqualTo("date", startDate);
+            exactQuery.lessThan("date", endDate);
+
+            const prefixQuery = new AV.Query("DailyProductSales");
+            prefixQuery.equalTo("storeName", "食圈儿 " + selectedStore);
+            prefixQuery.greaterThanOrEqualTo("date", startDate);
+            prefixQuery.lessThan("date", endDate);
+
+            const prefixSpaceQuery = new AV.Query("DailyProductSales");
+            prefixSpaceQuery.equalTo("storeName", "食圈儿" + selectedStore);
+            prefixSpaceQuery.greaterThanOrEqualTo("date", startDate);
+            prefixSpaceQuery.lessThan("date", endDate);
+
+            query = AV.Query.or(exactQuery, prefixQuery, prefixSpaceQuery);
+          }
+
+          // 设置分页参数
+          query.skip(skip);
+          query.limit(limit);
+          query.addAscending("date");
+          query.select(["date", "productName", "storeName", "quantity"]);
+
+          // 获取当前页数据
+          const results = await query.find();
+          allResults = allResults.concat(results);
+
+          // 判断是否还有更多数据
+          if (results.length < limit) {
+            hasMore = false;
+          } else {
+            skip += limit;
+          }
+        }
+
+        // 更新缓存
+        dataCache.sales.set(cacheKey, {
+          data: allResults,
+          timestamp: Date.now(),
+        });
+
+        return allResults;
+      }
+
+      // 获取商品信息（带缓存）
       async function fetchProductPrices() {
+        // 如果缓存有效，直接返回缓存数据
+        if (dataCache.products && isCacheValid(dataCache.products)) {
+          console.log("Using cached product data");
+          return dataCache.products.data;
+        }
+
+        console.log("Fetching fresh product data");
         const query = new AV.Query("Product");
         query.select(["name", "price", "category", "source"]);
         query.limit(1000);
         const products = await query.find();
 
-        // 创建商品价格和类别映射
+        // 创建商品信息映射
         const productMap = new Map();
         products.forEach((product) => {
           productMap.set(product.get("name"), {
             price: product.get("price") || 0,
             category: product.get("category"),
-            source: product.get("source") || "自制", // 默认为自制
+            source: product.get("source") || "自制",
           });
         });
+
+        // 更新缓存
+        dataCache.products = {
+          data: productMap,
+          timestamp: Date.now(),
+        };
+
         return productMap;
+      }
+
+      // 清除缓存的函数（可以在需要时调用，比如手动刷新数据）
+      function clearCache() {
+        dataCache.sales.clear();
+        dataCache.products = null;
+        console.log("Cache cleared");
+      }
+
+      // 在筛选条件变化时清除对应的缓存
+      function clearSpecificCache(timeRange, store) {
+        const cacheKey = generateCacheKey(timeRange, store);
+        dataCache.sales.delete(cacheKey);
+        console.log("Cleared cache for:", cacheKey);
       }
 
       // 计算统计数据
       async function calculateStatistics(salesData) {
-        // 获取商品价格信息
-        const productPrices = await fetchProductPrices();
+        // 获取商品信息
+        const productInfo = await fetchProductPrices();
+        const unmatchedProducts = new Set();
 
         const stats = {
           totalSales: 0,
@@ -611,34 +772,41 @@
           },
         };
 
-        // 计算总销售额和各种统计
+        // 处理每条销售记录
         salesData.forEach((record) => {
-          const quantity = record.get("quantity");
+          // 从销售记录中提取基础数据
+          const date = record.get("date");
           const productName = record.get("productName");
           const storeName = record.get("storeName");
+          const quantity = record.get("quantity");
 
           // 跳过包装袋的统计
           if (productName === "包装袋") {
             return;
           }
 
-          // 从商品映射中获取价格和类别
-          const productInfo = productPrices.get(productName) || {
-            price: 0,
-            category: "未知",
-          };
-          const amount = quantity * productInfo.price;
-          const category = productInfo.category;
+          // 从商品信息映射中获取商品详情
+          const product = productInfo.get(productName);
+          if (!product) {
+            unmatchedProducts.add(productName);
+            return;
+          }
+
+          // 使用商品信息计算销售额
+          const amount = quantity * product.price;
+          const category = product.category;
+          const source = product.source;
 
           // 累计总销售额和总订单数
           stats.totalSales += amount;
           stats.totalOrders += quantity;
 
           // 按类别统计
-          if (stats.categoryStats[category]) {
-            stats.categoryStats[category].quantity += quantity;
-            stats.categoryStats[category].amount += amount;
+          if (!stats.categoryStats[category]) {
+            stats.categoryStats[category] = { quantity: 0, amount: 0 };
           }
+          stats.categoryStats[category].quantity += quantity;
+          stats.categoryStats[category].amount += amount;
 
           // 统计店铺销售额
           if (!stats.storeRankings[storeName]) {
@@ -656,6 +824,7 @@
               quantity: 0,
               totalSales: 0,
               category: category,
+              source: source,
             };
           }
           stats.productRankings[productName].quantity += quantity;
@@ -665,6 +834,14 @@
         // 计算平均客单价
         stats.avgOrderValue =
           stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0;
+
+        // 移除未匹配商品的警告显示
+        if (unmatchedProducts.size > 0) {
+          console.warn(
+            "以下商品在商品列表中未找到对应信息：",
+            Array.from(unmatchedProducts).join(", ")
+          );
+        }
 
         return stats;
       }
@@ -678,7 +855,40 @@
         let previousData;
 
         const today = new Date();
+        const todayStr = today.toISOString().split("T")[0];
         today.setHours(0, 0, 0, 0);
+
+        // 创建基础查询条件
+        function createBaseQuery(startDate, endDate, store) {
+          if (store === "all") {
+            const query = new AV.Query("DailyProductSales");
+            query.greaterThanOrEqualTo("date", startDate);
+            query.lessThan("date", endDate);
+            return query;
+          } else {
+            // 创建三个查询条件：
+            // 1. 完全匹配（不带品牌前缀）
+            const exactQuery = new AV.Query("DailyProductSales");
+            exactQuery.equalTo("storeName", store);
+            exactQuery.greaterThanOrEqualTo("date", startDate);
+            exactQuery.lessThan("date", endDate);
+
+            // 2. 带品牌前缀匹配
+            const prefixQuery = new AV.Query("DailyProductSales");
+            prefixQuery.equalTo("storeName", "食圈儿 " + store);
+            prefixQuery.greaterThanOrEqualTo("date", startDate);
+            prefixQuery.lessThan("date", endDate);
+
+            // 3. 带品牌前缀但有空格变体的匹配
+            const prefixSpaceQuery = new AV.Query("DailyProductSales");
+            prefixSpaceQuery.equalTo("storeName", "食圈儿" + store);
+            prefixSpaceQuery.greaterThanOrEqualTo("date", startDate);
+            prefixSpaceQuery.lessThan("date", endDate);
+
+            // 合并三个查询条件（OR）
+            return AV.Query.or(exactQuery, prefixQuery, prefixSpaceQuery);
+          }
+        }
 
         switch (timeRange) {
           case "today":
@@ -689,33 +899,64 @@
             );
             break;
           case "last7days":
-            const previous7Start = new Date(
-              today.getTime() - 14 * 24 * 60 * 60 * 1000
+            const previous7Start = new Date(todayStr);
+            previous7Start.setDate(previous7Start.getDate() - 14);
+            const previous7End = new Date(todayStr);
+            previous7End.setDate(previous7End.getDate() - 7);
+
+            previous7Start.setHours(0, 0, 0, 0);
+            previous7End.setHours(0, 0, 0, 0);
+
+            const query7 = createBaseQuery(
+              previous7Start,
+              previous7End,
+              selectedStore
             );
-            const previous7End = new Date(
-              today.getTime() - 7 * 24 * 60 * 60 * 1000
+            previousData = await query7.find();
+            break;
+          case "last15days":
+            const previous15Start = new Date(todayStr);
+            previous15Start.setDate(previous15Start.getDate() - 30);
+            const previous15End = new Date(todayStr);
+            previous15End.setDate(previous15End.getDate() - 15);
+
+            previous15Start.setHours(0, 0, 0, 0);
+            previous15End.setHours(0, 0, 0, 0);
+
+            const query15 = createBaseQuery(
+              previous15Start,
+              previous15End,
+              selectedStore
             );
-            const query = new AV.Query("DailyProductSales");
-            query.greaterThanOrEqualTo("date", previous7Start);
-            query.lessThan("date", previous7End);
-            if (selectedStore !== "all") {
-              query.equalTo("storeName", selectedStore);
-            }
-            previousData = await query.find();
+            query15.select(["date", "productName", "storeName", "quantity"]);
+            query15.limit(1000);
+            previousData = await query15.find();
             break;
           case "last30days":
-            const previous30Start = new Date(
-              today.getTime() - 60 * 24 * 60 * 60 * 1000
+            // 当前30天的日期范围
+            const previous30Start = new Date(todayStr);
+            previous30Start.setDate(previous30Start.getDate() - 30);
+            const previous30End = new Date(todayStr);
+            previous30End.setDate(previous30End.getDate() + 1);
+
+            // 环比数据的日期范围（前一个30天）
+            const previous30CompStart = new Date(todayStr);
+            previous30CompStart.setDate(previous30CompStart.getDate() - 60);
+            const previous30CompEnd = new Date(todayStr);
+            previous30CompEnd.setDate(previous30CompEnd.getDate() - 30);
+
+            // 确保时间设置为0点
+            previous30CompStart.setHours(0, 0, 0, 0);
+            previous30CompEnd.setHours(0, 0, 0, 0);
+
+            // 创建查询并限制返回字段
+            const query30 = createBaseQuery(
+              previous30CompStart,
+              previous30CompEnd,
+              selectedStore
             );
-            const previous30End = new Date(
-              today.getTime() - 30 * 24 * 60 * 60 * 1000
-            );
-            const query30 = new AV.Query("DailyProductSales");
-            query30.greaterThanOrEqualTo("date", previous30Start);
-            query30.lessThan("date", previous30End);
-            if (selectedStore !== "all") {
-              query30.equalTo("storeName", selectedStore);
-            }
+            query30.select(["date", "productName", "storeName", "quantity"]);
+            query30.limit(1000);
             previousData = await query30.find();
             break;
           case "thisMonth":
@@ -729,14 +970,32 @@
               today.getMonth(),
               1
             );
-            const queryMonth = new AV.Query("DailyProductSales");
-            queryMonth.greaterThanOrEqualTo("date", lastMonthStart);
-            queryMonth.lessThan("date", lastMonthEnd);
-            if (selectedStore !== "all") {
-              queryMonth.equalTo("storeName", selectedStore);
-            }
+
+            lastMonthStart.setHours(0, 0, 0, 0);
+            lastMonthEnd.setHours(0, 0, 0, 0);
+
+            const queryMonth = createBaseQuery(
+              lastMonthStart,
+              lastMonthEnd,
+              selectedStore
+            );
             previousData = await queryMonth.find();
             break;
+        }
+
+        // 确保所有查询都只选择需要的字段
+        if (previousData) {
+          previousData = previousData.map((record) => {
+            return {
+              get: (field) => {
+                if (field === "date") return record.get("date");
+                if (field === "productName") return record.get("productName");
+                if (field === "storeName") return record.get("storeName");
+                if (field === "quantity") return record.get("quantity");
+                return null;
+              },
+            };
+          });
         }
 
         const current = await calculateStatistics(currentData);
@@ -1026,47 +1285,53 @@
       }
 
       // 更新统计显示
-      function updateStatisticsDisplay(stats, compareStats) {
-        // 更新关键指标
-        document.getElementById("totalSales").textContent = formatCurrency(
-          stats.totalSales
-        );
-        document.getElementById("totalOrders").textContent =
-          stats.totalOrders + "件";
-        document.getElementById("avgOrderValue").textContent = formatCurrency(
-          stats.avgOrderValue
-        );
+      function updateStatisticsDisplay(current, previous) {
+        // 检查必需的DOM元素是否存在
+        const elements = {
+          totalSales: document.getElementById("totalSales"),
+          totalSalesCompare: document.getElementById("totalSalesCompare"),
+          totalOrders: document.getElementById("totalOrders"),
+          totalOrdersCompare: document.getElementById("totalOrdersCompare"),
+          avgOrderValue: document.getElementById("avgOrderValue"),
+          avgOrderValueCompare: document.getElementById("avgOrderValueCompare"),
+        };
 
-        // 更新环比数据
-        if (compareStats) {
-          const salesCompare = calculateComparison(
-            stats.totalSales,
-            compareStats.totalSales
-          );
-          const ordersCompare = calculateComparison(
-            stats.totalOrders,
-            compareStats.totalOrders
-          );
-          const avgValueCompare = calculateComparison(
-            stats.avgOrderValue,
-            compareStats.avgOrderValue
-          );
-
-          document.getElementById("totalSalesCompare").innerHTML =
-            formatComparison(salesCompare);
-          document.getElementById("totalOrdersCompare").innerHTML =
-            formatComparison(ordersCompare);
-          document.getElementById("avgOrderValueCompare").innerHTML =
-            formatComparison(avgValueCompare);
+        // 检查所有必需的元素是否存在
+        for (const [key, element] of Object.entries(elements)) {
+          if (!element) {
+            console.error(`Missing required element: ${key}`);
+            return;
+          }
         }
 
+        // 更新总销售额
+        elements.totalSales.textContent = formatCurrency(current.totalSales);
+        elements.totalSalesCompare.innerHTML = formatComparison(
+          calculateComparison(current.totalSales, previous.totalSales)
+        );
+
+        // 更新总销售量
+        elements.totalOrders.textContent = `${current.totalOrders}件`;
+        elements.totalOrdersCompare.innerHTML = formatComparison(
+          calculateComparison(current.totalOrders, previous.totalOrders)
+        );
+
+        // 更新平均单价
+        elements.avgOrderValue.textContent = formatCurrency(
+          current.avgOrderValue
+        );
+        elements.avgOrderValueCompare.innerHTML = formatComparison(
+          calculateComparison(current.avgOrderValue, previous.avgOrderValue)
+        );
+
         // 更新类别统计饼图
-        updateCategoryPieCharts(stats);
+        updateCategoryPieCharts(current);
 
         // 更新商品排行
-        const productRankings = Object.entries(stats.productRankings)
-          .sort((a, b) => b[1].quantity - a[1].quantity)
-          .slice(0, 20); // 只显示前20名
+        const productRankings = Object.entries(current.productRankings)
+          .map(([product, data]) => [product, data])
+          .sort((a, b) => b[1].totalSales - a[1].totalSales)
+          .slice(0, 10);
 
         if (productRankings.length === 0) {
           showEmpty("productRankings", "暂无商品销售数据");
@@ -1091,10 +1356,10 @@
           productRankingsHtml;
 
         // 更新店铺排行
-        const storeRankings = Object.entries(stats.storeRankings)
+        const storeRankings = Object.entries(current.storeRankings)
           .map(([store, data]) => ({
-            // 统一处理店铺名，去除品牌前缀
-            name: store.replace("食圈儿 ", ""),
+            // 统一处理店铺名，去除品牌前缀和多余空格
+            name: store.replace(/^食圈儿\s*/, "").trim(),
             ...data,
           }))
           // 合并同名店铺的数据
@@ -1185,14 +1450,46 @@
         }
       }
 
-      // 应用筛选条件
-      async function applyFilters() {
+      // 修改 applyFilters 函数
+      async function applyFilters(forceRefresh = false) {
         const timeRange = document.getElementById("timeRange").value;
-        const storeFilter = document.getElementById("storeFilter");
-        const selectedStore = storeFilter.value;
+        const selectedStore = document.getElementById("storeFilter").value;
 
-        // 更新统计数据
-        await updateStatistics(timeRange, selectedStore);
+        if (forceRefresh) {
+          clearSpecificCache(timeRange, selectedStore);
+        }
+
+        try {
+          // 显示加载状态
+          showLoading("keyMetrics");
+          showLoading("storeRankings");
+          showLoading("productRankings");
+
+          // 获取数据
+          const data = await fetchComparisonData(timeRange, selectedStore);
+
+          // 隐藏加载状态
+          hideLoading("keyMetrics");
+          hideLoading("storeRankings");
+          hideLoading("productRankings");
+
+          // 更新显示
+          updateStatisticsDisplay(data.current, data.previous);
+          const chart = initSalesTrendChart();
+          await updateSalesTrendChart(
+            chart,
+            data.currentData,
+            data.previousData
+          );
+        } catch (error) {
+          console.error("更新统计数据失败:", error);
+          hideLoading("keyMetrics");
+          hideLoading("storeRankings");
+          hideLoading("productRankings");
+          showError("keyMetrics", "获取数据失败，请重试");
+          showError("storeRankings", "获取数据失败，请重试");
+          showError("productRankings", "获取数据失败，请重试");
+        }
       }
 
       // 页面加载时执行
