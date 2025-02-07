@@ -265,6 +265,10 @@
             <input type="text" name="name" required />
           </div>
           <div class="form-group">
+            <label>旧名字</label>
+            <input type="text" name="old_name" placeholder="可选" />
+          </div>
+          <div class="form-group">
             <label>价格</label>
             <input
               type="number"
@@ -309,8 +313,6 @@
             onchange="filterProducts()"
           >
             <option value="all">所有来源</option>
-            <option value="self_made">自制</option>
-            <option value="purchased">外采</option>
           </select>
           <input
             type="text"
@@ -319,19 +321,6 @@
             placeholder="搜索商品名称..."
             oninput="filterProducts()"
           />
-          <div style="margin-left: auto">
-            <span>每页显示：</span>
-            <select
-              id="pageSize"
-              class="filter-input"
-              onchange="updatePageSize()"
-            >
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select>
-          </div>
         </div>
 
         <!-- 表格 -->
@@ -341,6 +330,9 @@
               <tr>
                 <th onclick="sortProducts('name')">
                   商品名称 <span id="sortName"></span>
+                </th>
+                <th onclick="sortProducts('old_name')">
+                  旧名字 <span id="sortOldName"></span>
                 </th>
                 <th onclick="sortProducts('category')">
                   类型 <span id="sortCategory"></span>
@@ -414,6 +406,10 @@
             <input type="text" name="name" required />
           </div>
           <div class="form-group">
+            <label>旧名字</label>
+            <input type="text" name="old_name" placeholder="可选" />
+          </div>
+          <div class="form-group">
             <label>价格</label>
             <input type="number" name="price" required min="0" step="0.1" />
           </div>
@@ -462,8 +458,6 @@
       const productState = {
         allProducts: [],
         filteredProducts: [],
-        currentPage: 1,
-        pageSize: 10,
         sortField: "name",
         sortDirection: "asc",
         filters: {
@@ -483,6 +477,7 @@
           productState.allProducts = results.map((product) => ({
             id: product.id,
             name: product.get("name"),
+            old_name: product.get("old_name") || "",
             category: product.get("category"),
             source: product.get("source"),
             price: product.get("price"),
@@ -520,7 +515,6 @@
         );
 
         sortProducts(productState.sortField, true);
-        productState.currentPage = 1;
         renderProducts();
       }
 
@@ -537,17 +531,19 @@
         productState.sortField = field;
 
         // 更新排序图标
-        const fields = ["name", "category", "source", "price"];
+        const fields = ["name", "old_name", "category", "source", "price"];
         fields.forEach((f) => {
-          const span = document.getElementById(
-            `sort${f.charAt(0).toUpperCase() + f.slice(1)}`
-          );
-          span.textContent =
-            f === field
-              ? productState.sortDirection === "asc"
-                ? " ↑"
-                : " ↓"
-              : "";
+          const elementId = `sort${f.charAt(0).toUpperCase() + f.slice(1)}`;
+          const span = document.getElementById(elementId);
+          if (span) {
+            // 添加空值检查
+            span.textContent =
+              f === field
+                ? productState.sortDirection === "asc"
+                  ? " ↑"
+                  : " ↓"
+                : "";
+          }
         });
 
         productState.filteredProducts.sort((a, b) => {
@@ -555,7 +551,9 @@
           if (field === "price") {
             comparison = a[field] - b[field];
           } else {
-            comparison = String(a[field]).localeCompare(String(b[field]));
+            comparison = String(a[field] || "").localeCompare(
+              String(b[field] || "")
+            ); // 添加空值处理
           }
           return productState.sortDirection === "asc"
             ? comparison
@@ -596,15 +594,14 @@
       // 渲染商品列表
       function renderProducts() {
         const tbody = document.getElementById("productList");
-        const start = (productState.currentPage - 1) * productState.pageSize;
-        const end = start + productState.pageSize;
-        const pageProducts = productState.filteredProducts.slice(start, end);
+        const products = productState.filteredProducts;
 
-        tbody.innerHTML = pageProducts
+        tbody.innerHTML = products
           .map(
             (product) => `
           <tr>
             <td>${product.name}</td>
+            <td>${product.old_name || ""}</td>
             <td>${getCategoryText(product.category)}</td>
             <td>${getSourceText(product.source)}</td>
             <td>¥${product.price.toFixed(2)}</td>
@@ -620,14 +617,6 @@
         `
           )
           .join("");
-
-        // 更新分页信息
-        const totalPages = Math.ceil(
-          productState.filteredProducts.length / productState.pageSize
-        );
-        document.getElementById(
-          "pageInfo"
-        ).textContent = `第 ${productState.currentPage} 页，共 ${totalPages} 页 (共 ${productState.filteredProducts.length} 条)`;
       }
 
       // 获取类型文本
@@ -637,7 +626,20 @@
 
       // 获取来源文本
       function getSourceText(source) {
-        return source === "self_made" ? "自制" : "外采";
+        const sourceMap = {
+          purchased: "外采",
+          self_made: "自制",
+        };
+        return sourceMap[source] || source;
+      }
+
+      // 获取来源值
+      function getSourceValue(displayText) {
+        const sourceMap = {
+          外采: "purchased",
+          自制: "self_made",
+        };
+        return sourceMap[displayText] || displayText;
       }
 
       // 处理品类选择变化
@@ -661,6 +663,7 @@
         try {
           const form = event.target;
           const name = form.name.value;
+          const old_name = form.old_name.value;
           const categorySelect = form.category;
           const newCategoryInput = document.getElementById("newCategory");
           const source = form.source.value;
@@ -684,6 +687,7 @@
           const product = new Product();
 
           product.set("name", name);
+          product.set("old_name", old_name);
           product.set("category", category);
           product.set("price", price);
           product.set("source", source);
@@ -727,14 +731,52 @@
       // 编辑商品
       async function editProduct(productId) {
         try {
-          // 查询商品
           const query = new AV.Query("Product");
           const product = await query.get(productId);
+
+          // 更新编辑模态框的选项
+          const modalCategorySelect = document.querySelector(
+            '#editForm select[name="category"]'
+          );
+          const modalSourceSelect = document.querySelector(
+            '#editForm select[name="source"]'
+          );
+
+          // 获取当前所有类型选项
+          const categories = new Set(
+            Array.from(
+              document.querySelector('select[name="category"]').options
+            )
+              .map((opt) => opt.value)
+              .filter((val) => val !== "new")
+          );
+
+          // 更新编辑模态框的类型选项
+          modalCategorySelect.innerHTML = Array.from(categories)
+            .map(
+              (category) => `<option value="${category}">${category}</option>`
+            )
+            .join("");
+
+          // 获取当前所有来源选项
+          const sourceSelect = document.querySelector('select[name="source"]');
+          const sources = new Set(
+            Array.from(sourceSelect.options).map((opt) => opt.value)
+          );
+
+          // 更新编辑模态框的来源选项
+          modalSourceSelect.innerHTML = Array.from(sources)
+            .map(
+              (source) =>
+                `<option value="${source}">${getSourceText(source)}</option>`
+            )
+            .join("");
 
           // 填充表单
           const form = document.getElementById("editForm");
           form.category.value = product.get("category");
           form.name.value = product.get("name");
+          form.old_name.value = product.get("old_name") || "";
           form.price.value = product.get("price");
           form.source.value = product.get("source");
 
@@ -769,6 +811,7 @@
           // 更新商品信息
           product.set("category", form.category.value);
           product.set("name", form.name.value);
+          product.set("old_name", form.old_name.value);
           product.set("price", parseFloat(form.price.value));
           product.set("source", form.source.value);
 
@@ -809,6 +852,86 @@
 
       // 页面加载时执行
       checkAdmin();
+      fetchProducts();
+
+      // 加载商品类型和来源选项
+      async function loadProductOptions() {
+        try {
+          const query = new AV.Query("Product");
+          query.limit(1000);
+          const products = await query.find();
+
+          // 收集所有唯一的类型和来源
+          const categories = new Set();
+          const sources = new Set();
+
+          products.forEach((product) => {
+            const category = product.get("category");
+            const source = product.get("source");
+            if (category) categories.add(category);
+            if (source) sources.add(source);
+          });
+
+          // 更新类型选项
+          const categoryFilter = document.getElementById("categoryFilter");
+          const categorySelect = document.querySelector(
+            'select[name="category"]'
+          );
+          const categoryOptions = Array.from(categories).sort();
+
+          // 更新筛选器的类型选项
+          categoryFilter.innerHTML = '<option value="all">所有类别</option>';
+          categoryOptions.forEach((category) => {
+            categoryFilter.add(new Option(category, category));
+          });
+
+          // 更新添加表单的类型选项
+          categorySelect.innerHTML =
+            categoryOptions
+              .map(
+                (category) => `<option value="${category}">${category}</option>`
+              )
+              .join("") + '<option value="new">+ 新建类型</option>';
+
+          // 更新来源选项
+          const sourceFilter = document.getElementById("sourceFilter");
+          const sourceSelect = document.querySelector('select[name="source"]');
+          const sourceOptions = Array.from(sources).sort();
+
+          // 更新筛选器的来源选项
+          sourceFilter.innerHTML = '<option value="all">所有来源</option>';
+          sourceOptions.forEach((source) => {
+            sourceFilter.add(new Option(getSourceText(source), source));
+          });
+
+          // 更新添加表单的来源选项
+          sourceSelect.innerHTML = sourceOptions
+            .map(
+              (source) =>
+                `<option value="${source}">${getSourceText(source)}</option>`
+            )
+            .join("");
+
+          // 更新编辑模态框的来源选项
+          const modalSourceSelect = document.querySelector(
+            '#editForm select[name="source"]'
+          );
+          if (modalSourceSelect) {
+            modalSourceSelect.innerHTML = sourceOptions
+              .map(
+                (source) =>
+                  `<option value="${source}">${getSourceText(source)}</option>`
+              )
+              .join("");
+          }
+        } catch (error) {
+          console.error("加载商品选项失败:", error);
+        }
+      }
+
+      // 页面加载时执行
+      checkAdmin();
+      loadProductOptions();
       fetchProducts();
     </script>
   </body>

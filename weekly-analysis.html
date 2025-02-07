@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>周度销售分析 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .card-title {
+        font-size: 18px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      /* 筛选器样式 */
+      .filters {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+
+      .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .filter-label {
+        font-size: 14px;
+        color: #666;
+      }
+
+      .filter-select {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        min-width: 150px;
+        background: white;
+      }
+
+      /* 数据概览样式 */
+      .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .overview-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .overview-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+        margin-bottom: 5px;
+      }
+
+      .overview-label {
+        font-size: 14px;
+        color: #666;
+      }
+
+      .overview-trend {
+        margin-top: 8px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      /* 图表容器样式 */
+      .chart-container {
+        width: 100%;
+        height: 400px;
+        margin: 20px 0;
+      }
+
+      .chart-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      /* 数据表格样式 */
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+      }
+
+      .data-table th {
+        background: #f8f9fa;
+        font-weight: bold;
+        color: #333;
+      }
+
+      .data-table tbody tr:hover {
+        background: #f8f9fa;
+      }
+
+      /* 趋势指标样式 */
+      .trend-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
+
+      .trend-up {
+        background-color: #d4edda;
+        color: #28a745;
+      }
+
+      .trend-down {
+        background-color: #f8d7da;
+        color: #dc3545;
+      }
+
+      .trend-stable {
+        background-color: #e9ecef;
+        color: #6c757d;
+      }
+
+      /* 加载状态样式 */
+      .loading {
+        position: relative;
+      }
+
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+
+      /* 导出按钮样式 */
+      .btn-export {
+        background-color: #28a745;
+        color: white;
+      }
+
+      .btn-export:hover {
+        background-color: #218838;
+      }
+
+      /* 切换按钮组样式 */
+      .toggle-group {
+        display: flex;
+        gap: 1px;
+        background: #ddd;
+        padding: 2px;
+        border-radius: 4px;
+      }
+
+      .toggle-btn {
+        padding: 6px 12px;
+        border: none;
+        background: white;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .toggle-btn.active {
+        background: #007bff;
+        color: white;
+      }
+
+      .toggle-btn:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      .toggle-btn:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-left">
+        <a href="all-statistics.html" class="btn btn-back">返回统计概览</a>
+      </div>
+      <div class="header-right">
+        <select id="storeFilter" class="filter-select">
+          <!-- 店铺选项将通过JavaScript动态生成 -->
+        </select>
+        <button class="btn btn-export" onclick="exportData()">导出数据</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- 筛选器 -->
+      <div class="filters">
+        <div class="filter-item">
+          <label class="filter-label">时间范围</label>
+          <select
+            id="timeRangeFilter"
+            class="filter-select"
+            onchange="updateAnalysis()"
+          >
+            <option value="last6weeks">近6周</option>
+            <option value="last12weeks" selected>近12周</option>
+            <option value="last18weeks">近18周</option>
+            <option value="last24weeks">近24周</option>
+            <option value="allTime">全部时间</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label class="filter-label">商品分类</label>
+          <select
+            id="categoryFilter"
+            class="filter-select"
+            onchange="updateAnalysis()"
+          >
+            <option value="all">全部分类</option>
+            <option value="饮品类">饮品类</option>
+            <option value="烘焙类">烘焙类</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label class="filter-label">商品来源</label>
+          <select
+            id="sourceFilter"
+            class="filter-select"
+            onchange="updateAnalysis()"
+          >
+            <option value="all">全部来源</option>
+            <option value="自制">自制</option>
+            <option value="老广">老广</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 数据概览 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">数据概览</h2>
+          <div class="toggle-group">
+            <button
+              class="toggle-btn active"
+              onclick="toggleMetricView('quantity')"
+            >
+              销量
+            </button>
+            <button class="toggle-btn" onclick="toggleMetricView('amount')">
+              销售额
+            </button>
+          </div>
+        </div>
+        <div class="overview-grid">
+          <div class="overview-card">
+            <div class="overview-value" id="totalValue">-</div>
+            <div class="overview-label">总销量/销售额</div>
+            <div class="overview-trend" id="totalTrend">-</div>
+          </div>
+          <div class="overview-card">
+            <div class="overview-value" id="avgValue">-</div>
+            <div class="overview-label">周平均</div>
+            <div class="overview-trend" id="avgTrend">-</div>
+          </div>
+          <div class="overview-card">
+            <div class="overview-value" id="maxValue">-</div>
+            <div class="overview-label">单周最高</div>
+            <div class="overview-trend" id="peakTrend">-</div>
+          </div>
+          <div class="overview-card">
+            <div class="overview-value" id="growthRate">-</div>
+            <div class="overview-label">环比增长率</div>
+            <div class="overview-trend" id="growthTrend">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 趋势分析 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">趋势分析</h2>
+          <div class="toggle-group">
+            <button class="toggle-btn active" onclick="toggleChartType('line')">
+              折线图
+            </button>
+            <button class="toggle-btn" onclick="toggleChartType('bar')">
+              柱状图
+            </button>
+          </div>
+        </div>
+        <div class="chart-row">
+          <div id="trendChart" class="chart-container"></div>
+          <div id="categoryPieChart" class="chart-container"></div>
+        </div>
+      </div>
+
+      <!-- 商品分析 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">商品分析</h2>
+          <select id="productSortFilter" class="filter-select">
+            <option value="quantity">按销量排序</option>
+            <option value="amount">按销售额排序</option>
+            <option value="growth">按增长率排序</option>
+          </select>
+        </div>
+        <div id="productTable">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>排名</th>
+                <th>商品名称</th>
+                <th>分类</th>
+                <th>来源</th>
+                <th>销量</th>
+                <th>销售额</th>
+                <th>环比</th>
+                <th>占比</th>
+              </tr>
+            </thead>
+            <tbody id="productTableBody">
+              <!-- 商品数据将通过JavaScript动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 详细数据 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">详细数据</h2>
+          <button class="btn btn-export" onclick="exportDetailData()">
+            导出明细
+          </button>
+        </div>
+        <div id="detailTable">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>周次</th>
+                <th>开始日期</th>
+                <th>结束日期</th>
+                <th>销量</th>
+                <th>销售额</th>
+                <th>环比销量</th>
+                <th>环比销售额</th>
+                <th>商品数</th>
+              </tr>
+            </thead>
+            <tbody id="detailTableBody">
+              <!-- 详细数据将通过JavaScript动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 全局变量
+      let currentMetricView = "quantity"; // 当前指标视图：quantity/amount
+      let currentChartType = "line"; // 当前图表类型：line/bar
+      let weeklyData = null; // 缓存周度数据
+
+      // 数据缓存
+      const dataCache = {
+        rawSales: new Map(), // 存储原始销售数据
+        products: null, // 存储商品信息
+        cacheTimeout: 5 * 60 * 1000, // 缓存过期时间：5分钟
+      };
+
+      // 获取日期范围
+      function getDateRange(timeRange) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let startDate, endDate;
+        const weeksMap = {
+          last6weeks: 6,
+          last12weeks: 12,
+          last18weeks: 18,
+          last24weeks: 24,
+        };
+
+        if (timeRange === "allTime") {
+          startDate = new Date(2020, 0, 1); // 设置一个足够早的日期
+          endDate = new Date(today);
+          endDate.setDate(endDate.getDate() + 1);
+        } else {
+          const weeks = weeksMap[timeRange] || 12; // 默认12周
+          startDate = new Date(today);
+          startDate.setDate(today.getDate() - weeks * 7);
+          endDate = new Date(today);
+          endDate.setDate(endDate.getDate() + 1);
+        }
+
+        return { startDate, endDate };
+      }
+
+      // 获取周信息
+      function getWeekInfo(date) {
+        const d = new Date(date);
+        const firstDayOfWeek = new Date(d);
+        firstDayOfWeek.setDate(d.getDate() - d.getDay()); // 设置为周日
+
+        const lastDayOfWeek = new Date(firstDayOfWeek);
+        lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+
+        // 获取本周的周四，用于确定周所属的年份
+        const thursday = new Date(d);
+        thursday.setDate(d.getDate() + (4 - d.getDay()));
+
+        // 使用周四所在的年份作为这一周的年份
+        let year = thursday.getFullYear();
+        let weekNo = getWeekNumber(thursday);
+
+        // 特殊处理：如果是12月的最后一周，且包含了下一年的日期
+        if (
+          d.getMonth() === 11 &&
+          lastDayOfWeek.getFullYear() > year &&
+          weekNo === "01"
+        ) {
+          year = lastDayOfWeek.getFullYear();
+        }
+
+        return {
+          weekNumber: `${year}W${weekNo}`,
+          weekStart: firstDayOfWeek,
+          weekEnd: lastDayOfWeek,
+        };
+      }
+
+      // 获取周数
+      function getWeekNumber(date) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 4 - (d.getDay() || 7)); // 调整到本周的周四
+        const yearStart = new Date(d.getFullYear(), 0, 1);
+        const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+        return String(weekNo).padStart(2, "0");
+      }
+
+      // 获取商品信息
+      async function fetchProductPrices() {
+        // 如果缓存有效，直接返回缓存数据
+        if (
+          dataCache.products &&
+          Date.now() - dataCache.products.timestamp < dataCache.cacheTimeout
+        ) {
+          return dataCache.products; // 直接返回整个缓存对象，包含data和nameMapping
+        }
+
+        // 从数据库获取商品信息
+        const query = new AV.Query("Product");
+        query.select(["name", "price", "category", "source", "old_name"]);
+        query.limit(1000);
+        const products = await query.find();
+
+        // 创建商品信息映射
+        const productMap = new Map();
+        const nameMapping = new Map(); // 新旧名字映射
+
+        products.forEach((product) => {
+          const name = product.get("name");
+          const old_name = product.get("old_name");
+
+          productMap.set(name, {
+            price: product.get("price") || 0,
+            category: product.get("category"),
+            source: product.get("source") || "自制",
+          });
+
+          // 如果有旧名字，添加到映射中
+          if (old_name) {
+            nameMapping.set(old_name, name);
+          }
+        });
+
+        // 更新缓存
+        dataCache.products = {
+          data: productMap,
+          nameMapping: nameMapping,
+          timestamp: Date.now(),
+        };
+
+        return dataCache.products;
+      }
+
+      // 获取商品当前名字（处理新旧名字映射）
+      function getCurrentProductName(productName, nameMapping) {
+        if (!nameMapping) return productName; // 如果nameMapping不存在，直接返回原名字
+        return nameMapping.get(productName) || productName;
+      }
+
+      // 工具函数：标准化店铺名称
+      function normalizeStoreName(storeName) {
+        return storeName.replace(/^食圈儿\s*/, "").trim();
+      }
+
+      // 获取销售数据
+      async function fetchSalesData(timeRange, store) {
+        try {
+          // 使用单一缓存键
+          const cacheKey = "sales_";
+
+          // 检查 localStorage 缓存
+          const cachedData = localStorage.getItem(cacheKey);
+          if (cachedData) {
+            const { data, lastUpdate } = JSON.parse(cachedData);
+            console.log("Found cache in localStorage:", cacheKey);
+
+            // 检查是否需要更新
+            const needsUpdate = await checkIfNeedsUpdate(lastUpdate);
+            if (!needsUpdate) {
+              // 获取时间范围
+              const { startDate, endDate } = getDateRange(timeRange);
+
+              // 在内存中过滤数据
+              const filteredData = data.filter((record) => {
+                const recordDate = new Date(record.date);
+                return recordDate >= startDate && recordDate < endDate;
+              });
+
+              // 返回过滤后的数据，标准化店铺名称
+              return filteredData.map((record) => ({
+                ...record,
+                storeName: normalizeStoreName(record.storeName),
+              }));
+            }
+          }
+
+          // 如果没有缓存或需要更新，从数据库获取所有数据
+          console.log("Fetching all sales data");
+          let allResults = [];
+          let skip = 0;
+          const limit = 1000;
+          let hasMore = true;
+
+          // 创建基础查询 - 获取所有时间的数据
+          const createQuery = () => {
+            const query = new AV.Query("DailyProductSales");
+            query.select(["date", "productName", "storeName", "quantity"]);
+            query.addAscending("date");
+            query.limit(limit);
+            query.skip(skip);
+            return query;
+          };
+
+          while (hasMore) {
+            const query = createQuery();
+            console.log(`Fetching records ${skip} to ${skip + limit}...`);
+
+            try {
+              const results = await query.find();
+              if (results.length > 0) {
+                allResults = allResults.concat(results);
+                skip += limit;
+                console.log(
+                  `Fetched ${results.length} records, total: ${allResults.length}`
+                );
+              }
+
+              hasMore = results.length === limit;
+            } catch (error) {
+              console.error("Batch query failed:", error);
+              skip += limit;
+            }
+          }
+
+          console.log("Data fetching completed");
+          console.log(`Total records before processing: ${allResults.length}`);
+
+          // 转换为简单对象
+          const salesData = allResults.map((record) => ({
+            date: record.get("date"),
+            productName: record.get("productName"),
+            storeName: record.get("storeName"),
+            quantity: record.get("quantity"),
+          }));
+
+          console.log(`Total records after processing: ${salesData.length}`);
+
+          // 保存所有数据到 localStorage
+          localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              data: salesData,
+              lastUpdate: new Date().toISOString(),
+            })
+          );
+
+          // 根据时间范围过滤数据
+          const { startDate, endDate } = getDateRange(timeRange);
+          const filteredData = salesData.filter((record) => {
+            const recordDate = new Date(record.date);
+            return recordDate >= startDate && recordDate < endDate;
+          });
+
+          // 返回过滤后的数据，标准化店铺名称
+          return filteredData.map((record) => ({
+            ...record,
+            storeName: normalizeStoreName(record.storeName),
+          }));
+        } catch (error) {
+          console.error("获取销售数据失败:", error);
+          throw error;
+        }
+      }
+
+      // 检查是否需要更新
+      async function checkIfNeedsUpdate(lastUpdate) {
+        try {
+          // 检查最新的销售记录
+          const query = new AV.Query("DailyProductSales");
+          query.descending("date");
+          query.limit(1);
+          const latestRecord = await query.first();
+
+          if (!latestRecord) return false;
+
+          const latestDate = latestRecord.get("date");
+          const cacheDate = new Date(lastUpdate);
+
+          // 如果有新数据，需要更新
+          return latestDate > cacheDate;
+        } catch (error) {
+          console.error("检查更新失败:", error);
+          return true; // 如果检查失败，保险起见返回需要更新
+        }
+      }
+
+      // 计算周度统计数据
+      async function calculateWeeklyStats(salesData, store) {
+        // 获取商品信息和名字映射
+        const productInfo = await fetchProductPrices();
+        const productPrices = productInfo.data;
+        const nameMapping = productInfo.nameMapping;
+
+        // 按周分组数据
+        const weeklyData = {};
+
+        // 过滤店铺数据
+        const filteredSales =
+          store === "all"
+            ? salesData
+            : salesData.filter((record) => {
+                return normalizeStoreName(record.storeName) === store;
+              });
+
+        // 处理每条销售记录
+        filteredSales.forEach((record) => {
+          // 跳过包装袋
+          if (record.productName === "包装袋") return;
+
+          // 获取当前商品名（处理新旧名字映射）
+          const currentProductName = getCurrentProductName(
+            record.productName,
+            nameMapping
+          );
+
+          const date = record.date;
+          const weekInfo = getWeekInfo(date);
+          const weekKey = weekInfo.weekNumber;
+
+          // 初始化周数据
+          if (!weeklyData[weekKey]) {
+            weeklyData[weekKey] = {
+              weekStart: weekInfo.weekStart,
+              weekEnd: weekInfo.weekEnd,
+              products: {},
+              total: { quantity: 0, amount: 0 },
+            };
+          }
+
+          const productInfo = productPrices.get(currentProductName) || {
+            price: 0,
+            category: "未分类",
+            source: "自制",
+          };
+
+          // 初始化商品数据
+          if (!weeklyData[weekKey].products[currentProductName]) {
+            weeklyData[weekKey].products[currentProductName] = {
+              quantity: 0,
+              amount: 0,
+              category: productInfo.category,
+              source: productInfo.source,
+            };
+          }
+
+          // 累加数据
+          const amount = record.quantity * productInfo.price;
+          weeklyData[weekKey].products[currentProductName].quantity +=
+            record.quantity;
+          weeklyData[weekKey].products[currentProductName].amount += amount;
+          weeklyData[weekKey].total.quantity += record.quantity;
+          weeklyData[weekKey].total.amount += amount;
+        });
+
+        return weeklyData;
+      }
+
+      // 筛选周度数据
+      function filterWeeklyData(weeklyData, category, source) {
+        if (category === "all" && source === "all") {
+          return weeklyData;
+        }
+
+        const filteredData = {};
+        Object.entries(weeklyData).forEach(([week, weekData]) => {
+          const filteredProducts = {};
+          let hasProducts = false;
+          let weekTotal = { quantity: 0, amount: 0 };
+
+          Object.entries(weekData.products).forEach(([product, data]) => {
+            const matchCategory =
+              category === "all" || data.category === category;
+            const matchSource = source === "all" || data.source === source;
+
+            if (matchCategory && matchSource) {
+              filteredProducts[product] = data;
+              weekTotal.quantity += data.quantity;
+              weekTotal.amount += data.amount;
+              hasProducts = true;
+            }
+          });
+
+          if (hasProducts) {
+            filteredData[week] = {
+              weekStart: weekData.weekStart,
+              weekEnd: weekData.weekEnd,
+              products: filteredProducts,
+              total: weekTotal,
+            };
+          }
+        });
+
+        return filteredData;
+      }
+
+      // 更新分析数据
+      async function updateAnalysis() {
+        const timeRange = document.getElementById("timeRangeFilter").value;
+        const category = document.getElementById("categoryFilter").value;
+        const source = document.getElementById("sourceFilter").value;
+        const store = document.getElementById("storeFilter").value;
+
+        showLoading("trendChart");
+        showLoading("categoryPieChart");
+        showLoading("productTable");
+        showLoading("detailTable");
+
+        try {
+          // 获取原始销售数据
+          const salesData = await fetchSalesData(timeRange, store);
+
+          // 计算周度统计
+          const weeklyStats = await calculateWeeklyStats(salesData, store);
+
+          // 应用分类和来源筛选
+          weeklyData = filterWeeklyData(weeklyStats, category, source);
+
+          // 更新显示
+          updateDataDisplay();
+          updateTrendChart();
+          updateProductTable();
+          updateDetailTable();
+        } catch (error) {
+          console.error("更新分析数据失败:", error);
+        } finally {
+          hideLoading("trendChart");
+          hideLoading("categoryPieChart");
+          hideLoading("productTable");
+          hideLoading("detailTable");
+        }
+      }
+
+      // 计算概览数据
+      function calculateOverviewData(weeklyData) {
+        if (!weeklyData || Object.keys(weeklyData).length === 0) return null;
+
+        const weeks = Object.entries(weeklyData);
+        const overview = {
+          total: { quantity: 0, amount: 0 },
+          avg: { quantity: 0, amount: 0 },
+          max: { quantity: 0, amount: 0 },
+          growth: { quantity: 0, amount: 0 },
+        };
+
+        // 计算每周的总量
+        const weeklyTotals = weeks.map(([week, data]) => {
+          const weekTotal = { quantity: 0, amount: 0 };
+          Object.values(data.products).forEach((product) => {
+            weekTotal.quantity += product.quantity;
+            weekTotal.amount += product.amount;
+          });
+          return weekTotal;
+        });
+
+        // 计算总量
+        weeklyTotals.forEach((total) => {
+          overview.total.quantity += total.quantity;
+          overview.total.amount += total.amount;
+        });
+
+        // 计算平均值
+        const weekCount = weeklyTotals.length;
+        overview.avg.quantity = overview.total.quantity / weekCount;
+        overview.avg.amount = overview.total.amount / weekCount;
+
+        // 计算最大值
+        weeklyTotals.forEach((total) => {
+          overview.max.quantity = Math.max(
+            overview.max.quantity,
+            total.quantity
+          );
+          overview.max.amount = Math.max(overview.max.amount, total.amount);
+        });
+
+        // 计算环比增长率（最后一周与前一周的比较）
+        if (weeklyTotals.length >= 2) {
+          const lastWeek = weeklyTotals[weeklyTotals.length - 1];
+          const prevWeek = weeklyTotals[weeklyTotals.length - 2];
+
+          overview.growth.quantity = prevWeek.quantity
+            ? ((lastWeek.quantity - prevWeek.quantity) / prevWeek.quantity) *
+              100
+            : 0;
+          overview.growth.amount = prevWeek.amount
+            ? ((lastWeek.amount - prevWeek.amount) / prevWeek.amount) * 100
+            : 0;
+        }
+
+        return overview;
+      }
+
+      // 工具函数：格式化金额
+      function formatCurrency(amount) {
+        return new Intl.NumberFormat("zh-CN", {
+          style: "currency",
+          currency: "CNY",
+        }).format(amount);
+      }
+
+      // 工具函数：格式化数字
+      function formatNumber(num) {
+        return new Intl.NumberFormat("zh-CN").format(num);
+      }
+
+      // 工具函数：格式化日期
+      function formatDate(date) {
+        return dayjs(date).format("YYYY-MM-DD");
+      }
+
+      // 工具函数：显示加载状态
+      function showLoading(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.classList.add("loading");
+          if (!element.querySelector(".loading-overlay")) {
+            const overlay = document.createElement("div");
+            overlay.className = "loading-overlay";
+            overlay.innerHTML = '<div class="loading">加载中...</div>';
+            element.appendChild(overlay);
+          }
+        }
+      }
+
+      // 工具函数：隐藏加载状态
+      function hideLoading(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.classList.remove("loading");
+          const overlay = element.querySelector(".loading-overlay");
+          if (overlay) {
+            overlay.remove();
+          }
+        }
+      }
+
+      // 切换指标视图
+      function toggleMetricView(view) {
+        currentMetricView = view;
+        // 更新按钮状态
+        document.querySelectorAll(".toggle-group button").forEach((btn) => {
+          btn.classList.remove("active");
+          if (btn.textContent === (view === "quantity" ? "销量" : "销售额")) {
+            btn.classList.add("active");
+          }
+        });
+        // 更新数据显示
+        updateDataDisplay();
+      }
+
+      // 切换图表类型
+      function toggleChartType(type) {
+        currentChartType = type;
+        // 更新按钮状态
+        document.querySelectorAll(".toggle-group button").forEach((btn) => {
+          btn.classList.remove("active");
+          if (btn.textContent === (type === "line" ? "折线图" : "柱状图")) {
+            btn.classList.add("active");
+          }
+        });
+        // 更新图表
+        updateTrendChart();
+      }
+
+      // 更新数据显示
+      function updateDataDisplay() {
+        if (!weeklyData) return;
+
+        // 计算概览数据
+        const overviewData = calculateOverviewData(weeklyData);
+        if (!overviewData) return;
+
+        const metric = currentMetricView;
+        const formatValue =
+          metric === "quantity"
+            ? (val) => `${formatNumber(Math.round(val))}件`
+            : formatCurrency;
+
+        // 更新总量/金额
+        document.getElementById("totalValue").textContent = formatValue(
+          overviewData.total[metric]
+        );
+
+        // 更新周平均
+        document.getElementById("avgValue").textContent = formatValue(
+          overviewData.avg[metric]
+        );
+
+        // 更新最高值
+        document.getElementById("maxValue").textContent = formatValue(
+          overviewData.max[metric]
+        );
+
+        // 更新增长率
+        const growth = overviewData.growth[metric];
+        document.getElementById("growthRate").textContent = `${Math.abs(
+          growth
+        ).toFixed(1)}%`;
+
+        // 更新趋势指标
+        updateTrendIndicator("totalTrend", growth);
+        updateTrendIndicator("avgTrend", growth);
+        updateTrendIndicator("peakTrend", growth);
+        updateTrendIndicator("growthTrend", growth);
+      }
+
+      // 更新趋势指标
+      function updateTrendIndicator(elementId, value) {
+        const element = document.getElementById(elementId);
+        const trendClass =
+          value > 0 ? "trend-up" : value < 0 ? "trend-down" : "trend-stable";
+        const trendIcon = value > 0 ? "↑" : value < 0 ? "↓" : "→";
+        element.innerHTML = `<span class="trend-indicator ${trendClass}">${trendIcon} ${Math.abs(
+          value
+        ).toFixed(1)}%</span>`;
+      }
+
+      // 更新趋势图表
+      function updateTrendChart() {
+        if (!weeklyData) return;
+
+        const chart = echarts.init(document.getElementById("trendChart"));
+        const pieChart = echarts.init(
+          document.getElementById("categoryPieChart")
+        );
+
+        // 准备数据
+        const weeks = Object.entries(weeklyData);
+        const xAxisData = weeks.map(([week]) => week);
+        const metric = currentMetricView;
+
+        // 准备主图表数据
+        const seriesData = weeks.map(([, data]) => data.total[metric]);
+
+        // 准备分类数据
+        const categoryData = {};
+        weeks.forEach(([, weekData]) => {
+          Object.values(weekData.products).forEach((product) => {
+            if (!categoryData[product.category]) {
+              categoryData[product.category] = 0;
+            }
+            categoryData[product.category] += product[metric];
+          });
+        });
+
+        // 主图表配置
+        const option = {
+          title: {
+            text: metric === "quantity" ? "销量趋势" : "销售额趋势",
+            left: "center",
+          },
+          tooltip: {
+            trigger: "axis",
+            formatter: function (params) {
+              const value = params[0].value;
+              return `${params[0].name}<br/>${
+                metric === "quantity"
+                  ? `${formatNumber(value)}件`
+                  : formatCurrency(value)
+              }`;
+            },
+          },
+          xAxis: {
+            type: "category",
+            data: xAxisData,
+            axisLabel: {
+              interval: 0,
+              rotate: 45,
+            },
+          },
+          yAxis: {
+            type: "value",
+            name: metric === "quantity" ? "销量 (件)" : "销售额 (元)",
+            axisLabel: {
+              formatter: (value) =>
+                metric === "quantity"
+                  ? `${formatNumber(value)}`
+                  : `${(value / 1000).toFixed(1)}k`,
+            },
+          },
+          series: [
+            {
+              name: metric === "quantity" ? "销量" : "销售额",
+              type: currentChartType,
+              data: seriesData,
+              smooth: currentChartType === "line",
+              itemStyle: {
+                color: "#007bff",
+              },
+            },
+          ],
+        };
+
+        // 饼图配置
+        const pieOption = {
+          title: {
+            text: metric === "quantity" ? "销量分布" : "销售额分布",
+            left: "center",
+          },
+          tooltip: {
+            trigger: "item",
+            formatter: function (params) {
+              const value = params.value;
+              return `${params.name}<br/>${
+                metric === "quantity"
+                  ? `${formatNumber(value)}件`
+                  : formatCurrency(value)
+              } (${params.percent}%)`;
+            },
+          },
+          legend: {
+            orient: "horizontal",
+            bottom: 0,
+          },
+          series: [
+            {
+              name: metric === "quantity" ? "销量" : "销售额",
+              type: "pie",
+              radius: "50%",
+              data: Object.entries(categoryData).map(([category, value]) => ({
+                name: category,
+                value: value,
+              })),
+              emphasis: {
+                itemStyle: {
+                  shadowBlur: 10,
+                  shadowOffsetX: 0,
+                  shadowColor: "rgba(0, 0, 0, 0.5)",
+                },
+              },
+            },
+          ],
+        };
+
+        chart.setOption(option);
+        pieChart.setOption(pieOption);
+
+        // 监听窗口大小变化
+        window.addEventListener("resize", () => {
+          chart.resize();
+          pieChart.resize();
+        });
+      }
+
+      // 更新商品表格
+      function updateProductTable() {
+        if (!weeklyData) return;
+
+        const tbody = document.getElementById("productTableBody");
+        const metric = currentMetricView;
+        const sortBy = document.getElementById("productSortFilter").value;
+
+        // 汇总商品数据
+        const productStats = {};
+        const weeks = Object.values(weeklyData);
+
+        weeks.forEach((weekData, index) => {
+          Object.entries(weekData.products).forEach(([product, data]) => {
+            if (!productStats[product]) {
+              productStats[product] = {
+                name: product,
+                category: data.category,
+                source: data.source,
+                quantity: 0,
+                amount: 0,
+                lastWeekQuantity: 0,
+                lastWeekAmount: 0,
+                prevWeekQuantity: 0,
+                prevWeekAmount: 0,
+              };
+            }
+
+            productStats[product].quantity += data.quantity;
+            productStats[product].amount += data.amount;
+
+            // 记录最近两周的数据用于计算环比
+            if (index === weeks.length - 1) {
+              productStats[product].lastWeekQuantity = data.quantity;
+              productStats[product].lastWeekAmount = data.amount;
+            } else if (index === weeks.length - 2) {
+              productStats[product].prevWeekQuantity = data.quantity;
+              productStats[product].prevWeekAmount = data.amount;
+            }
+          });
+        });
+
+        // 计算环比和占比
+        const totalQuantity = Object.values(productStats).reduce(
+          (sum, p) => sum + p.quantity,
+          0
+        );
+        const totalAmount = Object.values(productStats).reduce(
+          (sum, p) => sum + p.amount,
+          0
+        );
+
+        Object.values(productStats).forEach((product) => {
+          product.quantityGrowth = calculateGrowth(
+            product.lastWeekQuantity,
+            product.prevWeekQuantity
+          );
+          product.amountGrowth = calculateGrowth(
+            product.lastWeekAmount,
+            product.prevWeekAmount
+          );
+          product.quantityShare = (product.quantity / totalQuantity) * 100;
+          product.amountShare = (product.amount / totalAmount) * 100;
+        });
+
+        // 排序
+        const products = Object.values(productStats).sort((a, b) => {
+          switch (sortBy) {
+            case "quantity":
+              return b.quantity - a.quantity;
+            case "amount":
+              return b.amount - a.amount;
+            case "growth":
+              return b[`${metric}Growth`] - a[`${metric}Growth`];
+            default:
+              return 0;
+          }
+        });
+
+        // 生成表格HTML
+        tbody.innerHTML = products
+          .map(
+            (product, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${product.name}</td>
+            <td>${product.category}</td>
+            <td>${product.source}</td>
+            <td>${formatNumber(product.quantity)}件</td>
+            <td>${formatCurrency(product.amount)}</td>
+            <td>
+              <span class="trend-indicator ${getTrendClass(
+                product[`${metric}Growth`]
+              )}">
+                ${getTrendIcon(product[`${metric}Growth`])} 
+                ${Math.abs(product[`${metric}Growth`]).toFixed(1)}%
+              </span>
+            </td>
+            <td>${product[`${metric}Share`].toFixed(1)}%</td>
+          </tr>
+        `
+          )
+          .join("");
+      }
+
+      // 更新详细数据表格
+      function updateDetailTable() {
+        if (!weeklyData) return;
+
+        const tbody = document.getElementById("detailTableBody");
+        const weeks = Object.entries(weeklyData);
+
+        // 生成表格HTML
+        tbody.innerHTML = weeks
+          .map(([week, data], index) => {
+            const prevWeek = index > 0 ? weeks[index - 1][1] : null;
+            const quantityGrowth = calculateGrowth(
+              data.total.quantity,
+              prevWeek ? prevWeek.total.quantity : data.total.quantity
+            );
+            const amountGrowth = calculateGrowth(
+              data.total.amount,
+              prevWeek ? prevWeek.total.amount : data.total.amount
+            );
+
+            return `
+            <tr>
+              <td>${week}</td>
+              <td>${formatDate(data.weekStart)}</td>
+              <td>${formatDate(data.weekEnd)}</td>
+              <td>${formatNumber(data.total.quantity)}件</td>
+              <td>${formatCurrency(data.total.amount)}</td>
+              <td>
+                <span class="trend-indicator ${getTrendClass(quantityGrowth)}">
+                  ${getTrendIcon(quantityGrowth)} ${Math.abs(
+              quantityGrowth
+            ).toFixed(1)}%
+                </span>
+              </td>
+              <td>
+                <span class="trend-indicator ${getTrendClass(amountGrowth)}">
+                  ${getTrendIcon(amountGrowth)} ${Math.abs(
+              amountGrowth
+            ).toFixed(1)}%
+                </span>
+              </td>
+              <td>${Object.keys(data.products).length}</td>
+            </tr>
+          `;
+          })
+          .join("");
+      }
+
+      // 工具函数：计算增长率
+      function calculateGrowth(current, previous) {
+        if (!previous) return 0;
+        return ((current - previous) / previous) * 100;
+      }
+
+      // 工具函数：获取趋势样式类
+      function getTrendClass(value) {
+        if (Math.abs(value) < 1) return "trend-stable";
+        return value > 0 ? "trend-up" : "trend-down";
+      }
+
+      // 工具函数：获取趋势图标
+      function getTrendIcon(value) {
+        if (Math.abs(value) < 1) return "→";
+        return value > 0 ? "↑" : "↓";
+      }
+
+      // 加载店铺列表
+      async function loadStoreOptions() {
+        try {
+          const query = new AV.Query("Store");
+          const stores = await query.find();
+          const storeFilter = document.getElementById("storeFilter");
+          storeFilter.innerHTML = '<option value="all">全部店铺</option>';
+
+          stores.forEach((store) => {
+            const fullName = store.get("name");
+            const displayName = normalizeStoreName(fullName);
+            const option = new Option(displayName, displayName);
+            storeFilter.add(option);
+          });
+
+          // 添加店铺变化事件监听
+          storeFilter.addEventListener("change", () => {
+            // 清除相关缓存
+            const timeRange = document.getElementById("timeRangeFilter").value;
+            const cacheKey = `weekly_stats_${timeRange}_${storeFilter.value}`;
+            localStorage.removeItem(cacheKey);
+            weeklyData = null;
+            // 更新数据
+            updateAnalysis();
+          });
+        } catch (error) {
+          console.error("加载店铺列表失败:", error);
+        }
+      }
+
+      // 加载筛选器选项
+      async function loadFilterOptions() {
+        try {
+          const query = new AV.Query("Product");
+          query.select(["category", "source"]);
+          query.limit(1000);
+          const products = await query.find();
+
+          // 收集所有唯一的分类和来源
+          const categories = new Set();
+          const sources = new Set();
+
+          products.forEach((product) => {
+            const category = product.get("category") || "其他";
+            const source = product.get("source") || "其他";
+            categories.add(category);
+            sources.add(source);
+          });
+
+          // 更新分类筛选器
+          const categoryFilter = document.getElementById("categoryFilter");
+          categoryFilter.innerHTML = '<option value="all">全部分类</option>';
+          Array.from(categories)
+            .sort()
+            .forEach((category) => {
+              categoryFilter.add(new Option(category, category));
+            });
+          if (!categories.has("其他")) {
+            categoryFilter.add(new Option("其他", "其他"));
+          }
+
+          // 更新来源筛选器
+          const sourceFilter = document.getElementById("sourceFilter");
+          sourceFilter.innerHTML = '<option value="all">全部来源</option>';
+          Array.from(sources)
+            .sort()
+            .forEach((source) => {
+              sourceFilter.add(new Option(source, source));
+            });
+          if (!sources.has("其他")) {
+            sourceFilter.add(new Option("其他", "其他"));
+          }
+        } catch (error) {
+          console.error("加载筛选器选项失败:", error);
+        }
+      }
+
+      // 导出数据
+      function exportData() {
+        if (!weeklyData) return;
+        // 实现数据导出逻辑
+      }
+
+      // 导出详细数据
+      function exportDetailData() {
+        if (!weeklyData) return;
+        // 实现详细数据导出逻辑
+      }
+
+      // 页面加载完成后初始化
+      window.onload = async function () {
+        // 检查登录状态
+        const currentUser = AV.User.current();
+        if (!currentUser) {
+          window.location.href = "index.html";
+          return;
+        }
+
+        // 加载店铺列表和筛选器选项
+        await Promise.all([loadStoreOptions(), loadFilterOptions()]);
+
+        // 加载初始数据
+        await updateAnalysis();
+      };
+    </script>
+  </body>
+</html>
