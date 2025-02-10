@@ -513,14 +513,14 @@
         </div>
       </div>
       <div class="header-right">
-        <select
-          id="storeFilter"
-          class="filter-select"
-          onchange="applyFilters()"
-        >
-          <!-- 店铺选项将通过JavaScript动态生成 -->
-        </select>
-      </div>
+            <select
+              id="storeFilter"
+              class="filter-select"
+              onchange="applyFilters()"
+            >
+              <!-- 店铺选项将通过JavaScript动态生成 -->
+            </select>
+          </div>
     </header>
 
     <div class="container">
@@ -794,46 +794,46 @@
         const limit = 1000;
         let hasMore = true;
 
-        // 设置日期范围时只考虑年月日
-        const today = new Date();
-        const todayStr = today.toISOString().split("T")[0];
-        today.setHours(0, 0, 0, 0);
+          // 设置日期范围时只考虑年月日
+          const today = new Date();
+          const todayStr = today.toISOString().split("T")[0];
+          today.setHours(0, 0, 0, 0);
 
-        let startDate, endDate;
-        switch (timeRange) {
-          case "today":
-            startDate = new Date(todayStr);
-            endDate = new Date(todayStr);
-            endDate.setDate(endDate.getDate() + 1);
-            break;
-          case "yesterday":
-            startDate = new Date(todayStr);
-            startDate.setDate(startDate.getDate() - 1);
-            endDate = new Date(todayStr);
-            break;
-          case "last7days":
-            startDate = new Date(todayStr);
-            startDate.setDate(startDate.getDate() - 7);
-            endDate = new Date(todayStr);
-            endDate.setDate(endDate.getDate() + 1);
-            break;
-          case "last15days":
-            startDate = new Date(todayStr);
-            startDate.setDate(startDate.getDate() - 15);
-            endDate = new Date(todayStr);
-            endDate.setDate(endDate.getDate() + 1);
-            break;
-          case "last30days":
-            startDate = new Date(todayStr);
-            startDate.setDate(startDate.getDate() - 30);
-            endDate = new Date(todayStr);
-            endDate.setDate(endDate.getDate() + 1);
-            break;
+          let startDate, endDate;
+          switch (timeRange) {
+            case "today":
+              startDate = new Date(todayStr);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "yesterday":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 1);
+              endDate = new Date(todayStr);
+              break;
+            case "last7days":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 7);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "last15days":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 15);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
+            case "last30days":
+              startDate = new Date(todayStr);
+              startDate.setDate(startDate.getDate() - 30);
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
           case "last3months":
             startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-            endDate = new Date(todayStr);
-            endDate.setDate(endDate.getDate() + 1);
-            break;
+              endDate = new Date(todayStr);
+              endDate.setDate(endDate.getDate() + 1);
+              break;
           case "last6months":
             startDate = new Date(today.getFullYear(), today.getMonth() - 6, 1);
             endDate = new Date(todayStr);
@@ -843,12 +843,12 @@
             startDate = new Date(2020, 0, 1); // 设置一个足够早的日期
             endDate = new Date(todayStr);
             endDate.setDate(endDate.getDate() + 1);
-            break;
-        }
+              break;
+          }
 
-        // 确保开始和结束日期都设置为当地时间的0点
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(0, 0, 0, 0);
+          // 确保开始和结束日期都设置为当地时间的0点
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(0, 0, 0, 0);
 
         while (hasMore) {
           let query;
@@ -876,13 +876,13 @@
           query.select(["date", "productName", "storeName", "quantity"]);
 
           try {
-            const results = await query.find();
-            allResults = allResults.concat(results);
+          const results = await query.find();
+          allResults = allResults.concat(results);
 
-            if (results.length < limit) {
-              hasMore = false;
-            } else {
-              skip += limit;
+          if (results.length < limit) {
+            hasMore = false;
+          } else {
+            skip += limit;
             }
           } catch (error) {
             console.error("Batch query failed:", error);

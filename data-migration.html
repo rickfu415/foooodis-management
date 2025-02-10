@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数据迁移 - 食圈儿后台管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        background-color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-back {
+        background-color: #6c757d;
+        color: white;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .card-header {
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .card-title {
+        font-size: 18px;
+        color: #333;
+      }
+
+      .progress-container {
+        margin: 20px 0;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 20px;
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      .progress {
+        width: 0%;
+        height: 100%;
+        background-color: #007bff;
+        transition: width 0.3s ease;
+      }
+
+      .log-container {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .log-entry {
+        margin: 5px 0;
+        padding: 5px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .success {
+        color: #28a745;
+      }
+
+      .error {
+        color: #dc3545;
+      }
+
+      .warning {
+        color: #ffc107;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin: 15px 0;
+      }
+
+      .description {
+        color: #666;
+        margin-bottom: 15px;
+        line-height: 1.5;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <a href="fix-store-names.html" class="btn btn-back">返回数据修复</a>
+      </div>
+      <div class="user-info">
+        <span id="adminName">管理员</span>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- 将LeanCloud数据导入本地 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">将LeanCloud数据导入本地</h2>
+        </div>
+        <div class="description">
+          此功能将从LeanCloud下载所有数据并保存到本地文件系统中，包括：
+          <ul style="margin-left: 20px; margin-top: 10px">
+            <li>商品数据</li>
+            <li>销售数据</li>
+            <li>店铺信息</li>
+            <li>盘点记录</li>
+          </ul>
+        </div>
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="downloadProducts()">
+            下载商品数据
+          </button>
+          <button class="btn btn-primary" onclick="downloadSales()">
+            下载销售数据
+          </button>
+          <button class="btn btn-primary" onclick="downloadStores()">
+            下载店铺信息
+          </button>
+          <button class="btn btn-primary" onclick="downloadInventory()">
+            下载盘点记录
+          </button>
+          <button class="btn btn-primary" onclick="downloadUsers()">
+            下载用户信息
+          </button>
+        </div>
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div id="progressBar" class="progress"></div>
+          </div>
+          <div id="progressText" style="text-align: center; margin-top: 10px">
+            准备开始...
+          </div>
+        </div>
+        <div class="log-container" id="logContainer">
+          <!-- 日志将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- MySQL数据导入 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">导入数据到MySQL</h2>
+        </div>
+        <div class="description">
+          此功能将数据直接导入到MySQL数据库中。请确保：
+          <ul style="margin-left: 20px; margin-top: 10px">
+            <li>MySQL服务已启动</li>
+            <li>数据库foooodis已创建</li>
+          </ul>
+        </div>
+        <div class="form-group" style="margin: 20px 0">
+          <label style="display: block; margin-bottom: 10px"
+            >MySQL连接配置</label
+          >
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+            <input
+              type="text"
+              id="mysqlHost"
+              placeholder="主机地址"
+              value="localhost"
+              class="form-control"
+            />
+            <input
+              type="text"
+              id="mysqlPort"
+              placeholder="端口"
+              value="3306"
+              class="form-control"
+            />
+            <input
+              type="text"
+              id="mysqlUser"
+              placeholder="用户名"
+              value="root"
+              class="form-control"
+            />
+            <input
+              type="password"
+              id="mysqlPassword"
+              placeholder="密码"
+              class="form-control"
+            />
+          </div>
+        </div>
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="createTables()">
+            创建数据表
+          </button>
+          <button class="btn btn-primary" onclick="importProducts()">
+            导入商品数据
+          </button>
+          <button class="btn btn-primary" onclick="importSales()">
+            导入销售数据
+          </button>
+          <button class="btn btn-primary" onclick="importStores()">
+            导入店铺数据
+          </button>
+          <button class="btn btn-primary" onclick="importInventory()">
+            导入盘点数据
+          </button>
+        </div>
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div id="mysqlProgressBar" class="progress"></div>
+          </div>
+          <div
+            id="mysqlProgressText"
+            style="text-align: center; margin-top: 10px"
+          >
+            准备开始...
+          </div>
+        </div>
+        <div class="log-container" id="mysqlLogContainer">
+          <!-- MySQL导入日志将在这里显示 -->
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 初始化 LeanCloud
+      AV.init({
+        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
+        appKey: "e4T5MriHgEYtmK7YPvV64awF",
+        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com",
+      });
+
+      // 检查管理员权限
+      async function checkAdmin() {
+        const currentUser = AV.User.current();
+        if (!currentUser) {
+          window.location.href = "index.html";
+          return;
+        }
+
+        const userData = JSON.parse(localStorage.getItem("user"));
+        if (userData.role !== "admin") {
+          alert("您没有访问此页面的权限");
+          window.location.href = "select-store.html";
+          return;
+        }
+
+        document.getElementById("adminName").textContent = userData.name;
+      }
+
+      // 添加日志
+      function addLog(message, type = "") {
+        const logContainer = document.getElementById("logContainer");
+        const logEntry = document.createElement("div");
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = message;
+        logContainer.insertBefore(logEntry, logContainer.firstChild);
+      }
+
+      // 更新进度
+      function updateProgress(current, total) {
+        const percentage = (current / total) * 100;
+        document.getElementById("progressBar").style.width = percentage + "%";
+        document.getElementById(
+          "progressText"
+        ).textContent = `处理进度: ${current}/${total} (${percentage.toFixed(
+          1
+        )}%)`;
+      }
+
+      // 下载商品数据
+      async function downloadProducts() {
+        try {
+          addLog("开始下载商品数据...");
+          const query = new AV.Query("Product");
+          query.limit(1000);
+          const products = await query.find();
+
+          // 生成SQL插入语句
+          let sqlStatements = [
+            "-- 创建商品表",
+            "SET NAMES utf8mb4;",
+            "CREATE TABLE IF NOT EXISTS products (",
+            "  id VARCHAR(50) PRIMARY KEY,",
+            "  name VARCHAR(255) NOT NULL,",
+            "  old_name VARCHAR(255),",
+            "  category VARCHAR(100),",
+            "  source VARCHAR(100),",
+            "  price DECIMAL(10,2)",
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+            "",
+            "-- 插入商品数据",
+          ];
+
+          products.forEach((product) => {
+            const values = [
+              `'${product.id}'`,
+              `'${product.get("name").replace(/'/g, "''")}'`,
+              product.get("old_name")
+                ? `'${product.get("old_name").replace(/'/g, "''")}'`
+                : "NULL",
+              product.get("category")
+                ? `'${product.get("category").replace(/'/g, "''")}'`
+                : "NULL",
+              product.get("source")
+                ? `'${product.get("source").replace(/'/g, "''")}'`
+                : "NULL",
+              product.get("price") || 0,
+            ];
+            sqlStatements.push(
+              `INSERT INTO products (id, name, old_name, category, source, price) VALUES (${values.join(
+                ", "
+              )});`
+            );
+          });
+
+          // 创建下载链接
+          const sqlContent = sqlStatements.join("\n");
+          const dataBlob = new Blob([sqlContent], { type: "text/plain" });
+          const url = URL.createObjectURL(dataBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "data/products.sql";
+
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          const fullPath =
+            window.location.pathname.substring(
+              0,
+              window.location.pathname.lastIndexOf("/")
+            ) + "/data/products.sql";
+          addLog(`成功导出 ${products.length} 条商品数据为SQL文件`, "success");
+          addLog(`文件保存在: ${fullPath}`, "success");
+        } catch (error) {
+          console.error("导出商品数据失败:", error);
+          addLog(`导出商品数据失败: ${error.message}`, "error");
+        }
+      }
+
+      // 下载销售数据
+      async function downloadSales() {
+        try {
+          addLog("开始下载销售数据...");
+          let allResults = [];
+          let skip = 0;
+          const limit = 1000;
+          let hasMore = true;
+
+          // 生成SQL创建表语句
+          let sqlStatements = [
+            "-- 创建销售数据表",
+            "SET NAMES utf8mb4;",
+            "CREATE TABLE IF NOT EXISTS sales (",
+            "  id INT AUTO_INCREMENT PRIMARY KEY,",
+            "  date DATE NOT NULL,",
+            "  store_name VARCHAR(255) NOT NULL,",
+            "  product_name VARCHAR(255) NOT NULL,",
+            "  quantity INT NOT NULL,",
+            "  price DECIMAL(10,2),",
+            "  INDEX idx_date (date),",
+            "  INDEX idx_store (store_name),",
+            "  INDEX idx_product (product_name)",
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+            "",
+            "-- 插入销售数据",
+          ];
+
+          while (hasMore) {
+            const query = new AV.Query("DailyProductSales");
+            query.limit(limit);
+            query.skip(skip);
+            query.addAscending("date");
+
+            const results = await query.find();
+            if (results.length > 0) {
+              results.forEach((sale) => {
+                const values = [
+                  `'${sale.get("date").toISOString().split("T")[0]}'`,
+                  `'${sale.get("storeName").replace(/'/g, "''")}'`,
+                  `'${sale.get("productName").replace(/'/g, "''")}'`,
+                  sale.get("quantity"),
+                  sale.get("price") || 0,
+                ];
+                sqlStatements.push(
+                  `INSERT INTO sales (date, store_name, product_name, quantity, price) VALUES (${values.join(
+                    ", "
+                  )});`
+                );
+              });
+
+              skip += results.length;
+              addLog(`已处理 ${skip} 条销售记录...`);
+              updateProgress(skip, skip + limit);
+            }
+
+            hasMore = results.length === limit;
+          }
+
+          // 创建下载链接
+          const sqlContent = sqlStatements.join("\n");
+          const dataBlob = new Blob([sqlContent], { type: "text/plain" });
+          const url = URL.createObjectURL(dataBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "data/sales.sql";
+
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          const fullPath =
+            window.location.pathname.substring(
+              0,
+              window.location.pathname.lastIndexOf("/")
+            ) + "/data/sales.sql";
+          addLog(`成功导出 ${skip} 条销售数据为SQL文件`, "success");
+          addLog(`文件保存在: ${fullPath}`, "success");
+        } catch (error) {
+          console.error("导出销售数据失败:", error);
+          addLog(`导出销售数据失败: ${error.message}`, "error");
+        }
+      }
+
+      // 下载店铺信息
+      async function downloadStores() {
+        try {
+          addLog("开始下载店铺信息...");
+          const query = new AV.Query("Store");
+          const stores = await query.find();
+
+          // 生成SQL插入语句
+          let sqlStatements = [
+            "-- 创建店铺表",
+            "SET NAMES utf8mb4;",
+            "CREATE TABLE IF NOT EXISTS stores (",
+            "  id VARCHAR(50) PRIMARY KEY,",
+            "  name VARCHAR(255) NOT NULL,",
+            "  brand VARCHAR(255),",
+            "  type VARCHAR(100),",
+            "  address TEXT,",
+            "  status VARCHAR(50)",
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+            "",
+            "-- 插入店铺数据",
+          ];
+
+          stores.forEach((store) => {
+            const values = [
+              `'${store.id}'`,
+              `'${store.get("name").replace(/'/g, "''")}'`,
+              store.get("brand")
+                ? `'${store.get("brand").replace(/'/g, "''")}'`
+                : "NULL",
+              store.get("type")
+                ? `'${store.get("type").replace(/'/g, "''")}'`
+                : "NULL",
+              store.get("address")
+                ? `'${store.get("address").replace(/'/g, "''")}'`
+                : "NULL",
+              store.get("status")
+                ? `'${store.get("status").replace(/'/g, "''")}'`
+                : "NULL",
+            ];
+            sqlStatements.push(
+              `INSERT INTO stores (id, name, brand, type, address, status) VALUES (${values.join(
+                ", "
+              )});`
+            );
+          });
+
+          // 创建下载链接
+          const sqlContent = sqlStatements.join("\n");
+          const dataBlob = new Blob([sqlContent], { type: "text/plain" });
+          const url = URL.createObjectURL(dataBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "data/stores.sql";
+
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          const fullPath =
+            window.location.pathname.substring(
+              0,
+              window.location.pathname.lastIndexOf("/")
+            ) + "/data/stores.sql";
+          addLog(`成功导出 ${stores.length} 条店铺信息为SQL文件`, "success");
+          addLog(`文件保存在: ${fullPath}`, "success");
+        } catch (error) {
+          console.error("导出店铺信息失败:", error);
+          addLog(`导出店铺信息失败: ${error.message}`, "error");
+        }
+      }
+
+      // 下载盘点记录
+      async function downloadInventory() {
+        try {
+          addLog("开始下载盘点记录...");
+          let allResults = [];
+          let skip = 0;
+          const limit = 1000;
+          let hasMore = true;
+
+          // 生成SQL创建表语句
+          let sqlStatements = [
+            "-- 创建盘点记录表",
+            "SET NAMES utf8mb4;",
+            "CREATE TABLE IF NOT EXISTS inventory (",
+            "  id INT AUTO_INCREMENT PRIMARY KEY,",
+            "  date DATE NOT NULL,",
+            "  store_name VARCHAR(255),",
+            "  store_id VARCHAR(50),",
+            "  operator VARCHAR(255),",
+            "  status VARCHAR(50),",
+            "  products JSON,",
+            "  INDEX idx_date (date),",
+            "  INDEX idx_store (store_name)",
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+            "",
+            "-- 插入盘点记录",
+          ];
+
+          while (hasMore) {
+            const query = new AV.Query("InventoryCheck");
+            query.limit(limit);
+            query.skip(skip);
+            query.addAscending("createdAt");
+
+            const results = await query.find();
+            if (results.length > 0) {
+              results.forEach((record) => {
+                const values = [
+                  `'${record.get("date").toISOString().split("T")[0]}'`,
+                  record.get("storeName")
+                    ? `'${record.get("storeName").replace(/'/g, "''")}'`
+                    : "NULL",
+                  record.get("storeId") ? `'${record.get("storeId")}'` : "NULL",
+                  record.get("operator")
+                    ? `'${record.get("operator").replace(/'/g, "''")}'`
+                    : "NULL",
+                  record.get("status") ? `'${record.get("status")}'` : "NULL",
+                  `'${JSON.stringify(record.get("products")).replace(
+                    /'/g,
+                    "''"
+                  )}'`,
+                ];
+                sqlStatements.push(
+                  `INSERT INTO inventory (date, store_name, store_id, operator, status, products) VALUES (${values.join(
+                    ", "
+                  )});`
+                );
+              });
+
+              skip += results.length;
+              addLog(`已处理 ${skip} 条盘点记录...`);
+              updateProgress(skip, skip + limit);
+            }
+
+            hasMore = results.length === limit;
+          }
+
+          // 创建下载链接
+          const sqlContent = sqlStatements.join("\n");
+          const dataBlob = new Blob([sqlContent], { type: "text/plain" });
+          const url = URL.createObjectURL(dataBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "data/inventory.sql";
+
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          const fullPath =
+            window.location.pathname.substring(
+              0,
+              window.location.pathname.lastIndexOf("/")
+            ) + "/data/inventory.sql";
+          addLog(`成功导出 ${skip} 条盘点记录为SQL文件`, "success");
+          addLog(`文件保存在: ${fullPath}`, "success");
+        } catch (error) {
+          console.error("导出盘点记录失败:", error);
+          addLog(`导出盘点记录失败: ${error.message}`, "error");
+        }
+      }
+
+      // 下载用户信息
+      async function downloadUsers() {
+        try {
+          addLog("开始下载用户信息...");
+          const query = new AV.Query("_User");
+          query.limit(1000);
+          const users = await query.find();
+
+          // 生成SQL插入语句
+          let sqlStatements = [
+            "-- 创建用户表",
+            "SET NAMES utf8mb4;",
+            "CREATE TABLE IF NOT EXISTS users (",
+            "  id VARCHAR(50) PRIMARY KEY,",
+            "  username VARCHAR(255) NOT NULL,",
+            "  password_hash VARCHAR(255),",
+            "  name VARCHAR(255),",
+            "  role VARCHAR(50),",
+            "  store_id VARCHAR(50),",
+            "  store_name VARCHAR(255),",
+            "  created_at DATETIME,",
+            "  updated_at DATETIME,",
+            "  INDEX idx_store (store_id),",
+            "  INDEX idx_role (role)",
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+            "",
+            "-- 插入用户数据",
+          ];
+
+          users.forEach((user) => {
+            const values = [
+              `'${user.id}'`,
+              `'${user.get("username").replace(/'/g, "''")}'`,
+              user.get("password")
+                ? `'${user.get("password").replace(/'/g, "''")}'`
+                : "NULL",
+              user.get("name")
+                ? `'${user.get("name").replace(/'/g, "''")}'`
+                : "NULL",
+              user.get("role")
+                ? `'${user.get("role").replace(/'/g, "''")}'`
+                : "NULL",
+              user.get("storeId") ? `'${user.get("storeId")}'` : "NULL",
+              user.get("storeName")
+                ? `'${user.get("storeName").replace(/'/g, "''")}'`
+                : "NULL",
+              user.createdAt
+                ? `'${user.createdAt
+                    .toISOString()
+                    .slice(0, 19)
+                    .replace("T", " ")}'`
+                : "NULL",
+              user.updatedAt
+                ? `'${user.updatedAt
+                    .toISOString()
+                    .slice(0, 19)
+                    .replace("T", " ")}'`
+                : "NULL",
+            ];
+            sqlStatements.push(
+              `INSERT INTO users (id, username, password_hash, name, role, store_id, store_name, created_at, updated_at) VALUES (${values.join(
+                ", "
+              )});`
+            );
+          });
+
+          // 创建下载链接
+          const sqlContent = sqlStatements.join("\n");
+          const dataBlob = new Blob([sqlContent], { type: "text/plain" });
+          const url = URL.createObjectURL(dataBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "data/users.sql";
+
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          const fullPath =
+            window.location.pathname.substring(
+              0,
+              window.location.pathname.lastIndexOf("/")
+            ) + "/data/users.sql";
+          addLog(`成功导出 ${users.length} 条用户数据为SQL文件`, "success");
+          addLog(`文件保存在: ${fullPath}`, "success");
+        } catch (error) {
+          console.error("导出用户数据失败:", error);
+          addLog(`导出用户数据失败: ${error.message}`, "error");
+        }
+      }
+
+      // MySQL导入相关函数
+      async function getConnectionConfig() {
+        return {
+          host: document.getElementById("mysqlHost").value,
+          port: parseInt(document.getElementById("mysqlPort").value),
+          user: document.getElementById("mysqlUser").value,
+          password: document.getElementById("mysqlPassword").value,
+          database: "foooodis",
+        };
+      }
+
+      // 添加MySQL日志
+      function addMySQLLog(message, type = "") {
+        const logContainer = document.getElementById("mysqlLogContainer");
+        const logEntry = document.createElement("div");
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = message;
+        logContainer.insertBefore(logEntry, logContainer.firstChild);
+      }
+
+      // 更新MySQL进度
+      function updateMySQLProgress(current, total) {
+        const percentage = (current / total) * 100;
+        document.getElementById("mysqlProgressBar").style.width =
+          percentage + "%";
+        document.getElementById(
+          "mysqlProgressText"
+        ).textContent = `处理进度: ${current}/${total} (${percentage.toFixed(
+          1
+        )}%)`;
+      }
+
+      // 创建数据表
+      async function createTables() {
+        try {
+          addMySQLLog("开始创建数据表...");
+          const config = await getConnectionConfig();
+
+          const response = await fetch(
+            "http://localhost:3000/api/mysql/create-tables",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(config),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+
+          const result = await response.json();
+          addMySQLLog("数据表创建成功！", "success");
+        } catch (error) {
+          console.error("创建数据表失败:", error);
+          addMySQLLog(`创建数据表失败: ${error.message}`, "error");
+        }
+      }
+
+      // 导入商品数据
+      async function importProducts() {
+        try {
+          addMySQLLog("开始导入商品数据...");
+          const config = await getConnectionConfig();
+
+          // 从LeanCloud获取商品数据
+          const query = new AV.Query("Product");
+          query.limit(1000);
+          const products = await query.find();
+
+          // 转换数据格式
+          const productsData = products.map((product) => ({
+            id: product.id,
+            name: product.get("name"),
+            old_name: product.get("old_name"),
+            category: product.get("category"),
+            source: product.get("source"),
+            price: product.get("price"),
+          }));
+
+          // 发送到后端进行导入
+          const response = await fetch(
+            "http://localhost:3000/api/mysql/import-products",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                config,
+                data: productsData,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+
+          const result = await response.json();
+          addMySQLLog(`成功导入 ${result.count} 条商品数据`, "success");
+        } catch (error) {
+          console.error("导入商品数据失败:", error);
+          addMySQLLog(`导入商品数据失败: ${error.message}`, "error");
+        }
+      }
+
+      // 导入销售数据
+      async function importSales() {
+        try {
+          addMySQLLog("开始导入销售数据...");
+          const config = await getConnectionConfig();
+
+          let allResults = [];
+          let skip = 0;
+          const limit = 1000;
+          let hasMore = true;
+
+          while (hasMore) {
+            const query = new AV.Query("DailyProductSales");
+            query.limit(limit);
+            query.skip(skip);
+            query.addAscending("date");
+
+            const results = await query.find();
+            if (results.length > 0) {
+              const salesData = results.map((sale) => ({
+                date: sale.get("date").toISOString().split("T")[0],
+                store_name: sale.get("storeName"),
+                product_name: sale.get("productName"),
+                quantity: sale.get("quantity"),
+                price: sale.get("price") || 0,
+              }));
+
+              // 分批发送到后端进行导入
+              const response = await fetch(
+                "http://localhost:3000/api/mysql/import-sales",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    config,
+                    data: salesData,
+                  }),
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error(await response.text());
+              }
+
+              skip += results.length;
+              addMySQLLog(`已导入 ${skip} 条销售记录...`);
+              updateMySQLProgress(skip, skip + limit);
+            }
+
+            hasMore = results.length === limit;
+          }
+
+          addMySQLLog(`成功导入所有销售数据`, "success");
+        } catch (error) {
+          console.error("导入销售数据失败:", error);
+          addMySQLLog(`导入销售数据失败: ${error.message}`, "error");
+        }
+      }
+
+      // 导入店铺数据
+      async function importStores() {
+        try {
+          addMySQLLog("开始导入店铺数据...");
+          const config = await getConnectionConfig();
+
+          const query = new AV.Query("Store");
+          const stores = await query.find();
+
+          const storesData = stores.map((store) => ({
+            id: store.id,
+            name: store.get("name"),
+            brand: store.get("brand"),
+            type: store.get("type"),
+            address: store.get("address"),
+            status: store.get("status"),
+          }));
+
+          const response = await fetch(
+            "http://localhost:3000/api/mysql/import-stores",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                config,
+                data: storesData,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+
+          const result = await response.json();
+          addMySQLLog(`成功导入 ${result.count} 条店铺数据`, "success");
+        } catch (error) {
+          console.error("导入店铺数据失败:", error);
+          addMySQLLog(`导入店铺数据失败: ${error.message}`, "error");
+        }
+      }
+
+      // 导入盘点数据
+      async function importInventory() {
+        try {
+          addMySQLLog("开始导入盘点记录...");
+          const config = await getConnectionConfig();
+
+          let allResults = [];
+          let skip = 0;
+          const limit = 1000;
+          let hasMore = true;
+
+          while (hasMore) {
+            const query = new AV.Query("InventoryCheck");
+            query.limit(limit);
+            query.skip(skip);
+            query.addAscending("createdAt");
+
+            const results = await query.find();
+            if (results.length > 0) {
+              const inventoryData = results.map((record) => ({
+                date: record.get("date").toISOString().split("T")[0],
+                store_name: record.get("storeName"),
+                store_id: record.get("storeId"),
+                operator: record.get("operator"),
+                status: record.get("status"),
+                products: JSON.stringify(record.get("products")),
+              }));
+
+              // 分批发送到后端进行导入
+              const response = await fetch(
+                "http://localhost:3000/api/mysql/import-inventory",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    config,
+                    data: inventoryData,
+                  }),
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error(await response.text());
+              }
+
+              skip += results.length;
+              addMySQLLog(`已导入 ${skip} 条盘点记录...`);
+              updateMySQLProgress(skip, skip + limit);
+            }
+
+            hasMore = results.length === limit;
+          }
+
+          addMySQLLog(`成功导入所有盘点记录`, "success");
+        } catch (error) {
+          console.error("导入盘点记录失败:", error);
+          addMySQLLog(`导入盘点记录失败: ${error.message}`, "error");
+        }
+      }
+
+      // 页面加载时执行
+      window.onload = async function () {
+        try {
+          await checkAdmin();
+          console.log("管理员验证通过");
+        } catch (error) {
+          console.error("页面加载失败:", error);
+          alert("页面加载失败，请刷新重试");
+        }
+      };
+    </script>
+  </body>
+</html>
