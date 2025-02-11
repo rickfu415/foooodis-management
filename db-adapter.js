@@ -16,11 +16,11 @@ class DatabaseAdapter {
   }
 
   async createUser(userData) {
-    const { username, password_hash, name, role, store_id, store_name } =
+    const { id, username, password_hash, name, role, store_id, store_name } =
       userData;
     const [result] = await this.pool.execute(
-      "INSERT INTO users (username, password_hash, name, role, store_id, store_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
-      [username, password_hash, name, role, store_id, store_name]
+      "INSERT INTO users (id, username, password_hash, name, role, store_id, store_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+      [id, username, password_hash, name, role, store_id, store_name]
     );
     return result.insertId;
   }

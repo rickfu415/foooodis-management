@@ -2,10 +2,11 @@ const express = require("express");
 const mysql = require("mysql2/promise");
 const bcrypt = require("bcryptjs");
 const db = require("./db-adapter");
+const path = require("path");
 const app = express();
 
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(__dirname));
 
 // 登录路由
 app.post("/api/login", async (req, res) => {
@@ -42,6 +43,23 @@ app.post("/api/mysql/create-tables", async (req, res) => {
   try {
     // 设置字符集
     await connection.execute(`SET NAMES utf8mb4;`);
+
+    // 创建用户表
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY,
+        username VARCHAR(255) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        role VARCHAR(50),
+        store_id VARCHAR(50),
+        store_name VARCHAR(255),
+        created_at DATETIME,
+        updated_at DATETIME,
+        INDEX idx_username (username),
+        INDEX idx_role (role)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
 
     // 创建商品表
     await connection.execute(`

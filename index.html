@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>食圈儿 管理系统 - 员工登录</title>
+    <title>食圈儿 管理系统</title>
     <style>
       * {
         margin: 0;
@@ -112,17 +112,29 @@
     <div class="login-container">
       <h1 class="login-title">
         食圈儿 <br />
-        后台管理系统 - 员工登录
+        管理系统 - 登录
       </h1>
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label for="username">用户名</label>
-          <input type="text" id="username" name="username" required />
+          <input
+            type="text"
+            id="username"
+            name="username"
+            required
+            autocomplete="username"
+          />
           <div class="error-message" id="username-error"></div>
         </div>
         <div class="form-group">
           <label for="password">密码</label>
-          <input type="password" id="password" name="password" required />
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+          />
           <div class="error-message" id="password-error"></div>
         </div>
         <button type="submit" class="login-button" id="loginButton">
@@ -180,16 +192,8 @@
             localStorage.setItem("user", JSON.stringify(data.user));
             localStorage.setItem("lastUsername", username);
 
-            // 根据用户角色和店铺信息决定跳转
-            if (data.user.role === "admin") {
-              window.location.href = "dashboard.html";
-            } else {
-              if (data.user.store_id && data.user.store_name) {
-                window.location.href = "dashboard.html";
-              } else {
-                window.location.href = "select-store.html";
-              }
-            }
+            // 所有用户都先进入选择店铺页面
+            window.location.href = "select-store.html";
           } else {
             document.getElementById("password-error").textContent = data.error;
             document.getElementById("password-error").style.display = "block";
