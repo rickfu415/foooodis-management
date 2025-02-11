@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>食圈儿 后台管理系统 - 员工登录</title>
+    <title>登录 - 食圈儿后台管理系统</title>
     <style>
       * {
         margin: 0;
@@ -16,35 +16,42 @@
         background-color: #f5f5f5;
         min-height: 100vh;
         display: flex;
-        flex-direction: column;
+        justify-content: center;
         align-items: center;
-        padding: 20px;
       }
 
       .login-container {
         background-color: white;
-        padding: 20px;
+        padding: 40px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         width: 100%;
         max-width: 400px;
-        margin-top: 40px;
       }
 
-      .login-title {
+      .logo {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .logo img {
+        max-width: 150px;
+      }
+
+      h1 {
         text-align: center;
         color: #333;
-        margin-bottom: 20px;
+        margin-bottom: 30px;
       }
 
       .form-group {
-        margin-bottom: 15px;
+        margin-bottom: 20px;
       }
 
       label {
         display: block;
         margin-bottom: 5px;
-        color: #555;
+        color: #666;
       }
 
       input {
@@ -55,7 +62,7 @@
         font-size: 16px;
       }
 
-      .login-button {
+      button {
         width: 100%;
         padding: 12px;
         background-color: #007bff;
@@ -64,167 +71,114 @@
         border-radius: 4px;
         font-size: 16px;
         cursor: pointer;
-        margin-top: 10px;
       }
 
-      .login-button:hover {
+      button:hover {
         background-color: #0056b3;
-      }
-
-      .login-button.loading {
-        background-color: #ccc;
-        cursor: not-allowed;
-        position: relative;
-      }
-
-      .login-button.loading::after {
-        content: "";
-        position: absolute;
-        width: 20px;
-        height: 20px;
-        top: 50%;
-        left: 50%;
-        margin: -10px 0 0 -10px;
-        border: 3px solid #ffffff;
-        border-top: 3px solid transparent;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
       }
 
       .error-message {
         color: #dc3545;
-        font-size: 14px;
-        margin-top: 4px;
+        margin-top: 15px;
+        text-align: center;
         display: none;
       }
     </style>
-    <!-- LeanCloud SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
-
-    <!-- 初始化 LeanCloud -->
-    <script>
-      // 初始化 LeanCloud
-      AV.init({
-        appId: "mkIfcbivpuTduCrNfh53VqYV-MdYXbMMI",
-        appKey: "e4T5MriHgEYtmK7YPvV64awF",
-        serverURL: "https://mkifcbivputducrnfh53vqyv.api.lncldglobal.com", // International API server
-      });
-
-      // 检查用户是否已登录
-      async function checkAdmin() {
-        const currentUser = AV.User.current();
-        if (!currentUser) {
-          window.location.href = "index.html";
-        }
-      }
-    </script>
   </head>
   <body>
     <div class="login-container">
-      <h1 class="login-title">
-        食圈儿 <br />
-        后台管理系统 - 员工登录
-      </h1>
-      <form id="loginForm">
+      <div class="logo">
+        <img src="logo.png" alt="食圈儿" />
+      </div>
+      <h1>后台管理系统</h1>
+      <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label for="username">用户名</label>
-          <input type="text" id="username" name="username" required />
-          <div class="error-message" id="username-error"></div>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            required
+            autocomplete="username"
+          />
         </div>
         <div class="form-group">
           <label for="password">密码</label>
-          <input type="password" id="password" name="password" required />
-          <div class="error-message" id="password-error"></div>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+          />
         </div>
-        <button type="submit" class="login-button" id="loginButton">
-          登录
-        </button>
+        <button type="submit">登录</button>
+        <div id="errorMessage" class="error-message"></div>
       </form>
     </div>
 
     <script>
-      // 页面加载时检查是否有保存的用户名
-      window.addEventListener("load", function () {
-        const savedUsername = localStorage.getItem("lastUsername");
-        if (savedUsername) {
-          document.getElementById("username").value = savedUsername;
-        }
-      });
+      async function handleLogin(event) {
+        event.preventDefault();
 
-      document
-        .getElementById("loginForm")
-        .addEventListener("submit", async function (e) {
-          e.preventDefault();
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const errorMessage = document.getElementById("errorMessage");
 
-          // Reset error messages
-          document.querySelectorAll(".error-message").forEach((elem) => {
-            elem.style.display = "none";
+        try {
+          const response = await fetch("/api/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password }),
           });
 
-          // Get form values
-          const username = document.getElementById("username").value.trim();
-          const password = document.getElementById("password").value.trim();
+          const data = await response.json();
 
-          // 保存用户名到 localStorage
-          localStorage.setItem("lastUsername", username);
+          if (response.ok) {
+            // 登录成功
+            localStorage.setItem("user", JSON.stringify(data.user));
+            // 保存用户名以便下次使用
+            localStorage.setItem("lastUsername", username);
 
-          // Validate username
-          if (username.length < 3) {
-            document.getElementById("username-error").textContent =
-              "用户名至少需要3个字符";
-            document.getElementById("username-error").style.display = "block";
-            return;
+            // 根据用户角色和店铺信息决定跳转
+            if (data.user.role === "admin") {
+              // 管理员直接进入管理面板
+              window.location.href = "dashboard.html";
+            } else {
+              // 普通员工
+              if (data.user.store_id && data.user.store_name) {
+                // 如果已经有绑定的店铺，直接进入工作台
+                window.location.href = "dashboard.html";
+              } else {
+                // 如果没有绑定店铺，进入店铺选择页面
+                window.location.href = "select-store.html";
+              }
+            }
+          } else {
+            // 显示错误信息
+            errorMessage.textContent = data.error;
+            errorMessage.style.display = "block";
           }
+        } catch (error) {
+          console.error("登录失败:", error);
+          errorMessage.textContent = "登录失败，请重试";
+          errorMessage.style.display = "block";
+        }
+      }
 
-          // Validate password
-          if (password.length < 6) {
-            document.getElementById("password-error").textContent =
-              "密码至少需要6个字符";
-            document.getElementById("password-error").style.display = "block";
-            return;
-          }
+      // 检查是否已登录
+      window.onload = function () {
+        // 清除可能存在的旧登录信息
+        localStorage.removeItem("user");
 
-          // Show loading state
-          const loginButton = document.getElementById("loginButton");
-          loginButton.classList.add("loading");
-          loginButton.disabled = true;
-          loginButton.textContent = "";
-
-          try {
-            // Login with LeanCloud
-            const user = await AV.User.logIn(username, password);
-
-            // Store user info in localStorage
-            const userData = {
-              id: user.id,
-              username: user.get("username"),
-              name: user.get("name"),
-              role: user.get("role"),
-              sessionToken: user.getSessionToken(), // 保存会话令牌
-            };
-            localStorage.setItem("user", JSON.stringify(userData));
-
-            // Redirect to store selection page
-            window.location.href = "select-store.html";
-          } catch (error) {
-            console.error("Login failed:", error);
-            alert(error.message || "登录失败，请重试");
-          } finally {
-            // Reset button state
-            loginButton.classList.remove("loading");
-            loginButton.disabled = false;
-            loginButton.textContent = "登录";
-          }
-        });
+        // 恢复上次使用的用户名（如果有）
+        const lastUsername = localStorage.getItem("lastUsername");
+        if (lastUsername) {
+          document.getElementById("username").value = lastUsername;
+        }
+      };
     </script>
   </body>
 </html>

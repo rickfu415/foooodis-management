@@ -1,8 +1,40 @@
 const express = require("express");
 const mysql = require("mysql2/promise");
+const bcrypt = require("bcryptjs");
+const db = require("./db-adapter");
 const app = express();
 
 app.use(express.json());
+app.use(express.static("public"));
+
+// 登录路由
+app.post("/api/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // 获取用户信息
+    const user = await db.getUserByUsername(username);
+    if (!user) {
+      return res.status(401).json({ error: "用户名或密码错误" });
+    }
+
+    // 验证密码
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) {
+      return res.status(401).json({ error: "用户名或密码错误" });
+    }
+
+    // 返回用户信息（不包含密码）
+    const { password_hash, ...userInfo } = user;
+    res.json({
+      success: true,
+      user: userInfo,
+    });
+  } catch (error) {
+    console.error("登录失败:", error);
+    res.status(500).json({ error: "登录失败，请重试" });
+  }
+});
 
 // 创建数据表
 app.post("/api/mysql/create-tables", async (req, res) => {
